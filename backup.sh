@@ -5,7 +5,7 @@
 ############################## #################################
 
 
-
+# Initializes the script with conf file, script location and alias
 function init {
 
 	echo "";
@@ -80,24 +80,29 @@ function init {
 
 	sudo cp ./backup.sh /usr/local/bin/backup.sh;
 	sudo touch ./backup.conf;
+	sudo bash -c "echo user_path=$user_path >> ./backup.conf";
 	sudo bash -c "echo user=$(whoami) >> ./backup.conf";
 	sudo bash -c "echo location=$backup >> ./backup.conf";
 	sudo bash -c "echo folder=$folder >> ./backup.conf";
 	sudo mv ./backup.conf /etc/defaults/backup.conf;
-
+	sudo bash -c "echo alias backup='/usr/local/bin/backup.sh' >> ~/.bash_profile";
+	. ~/.bash_profile;
 	exit;
 }
 
-if [ ! -f /etc/back_me_up.conf ]; then
+if [ ! -f /etc/defaults/backup.conf ]; then
 	init;
 fi
 
 # This bash script is used to perform various backups
 
-. /etc/defaults/back_me_up.conf;
+. /etc/defaults/backup.conf;
 user="$user";
 default_backup_location="$location";
 default_backup_folder="$folder";
+echo "$user";
+echo "$default_backup_location";
+echo "$default_backup_folder";
 
 while getopts 'u:f:b:' option; do
     case "${option}" in
