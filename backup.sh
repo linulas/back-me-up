@@ -97,9 +97,11 @@ fi
 # This bash script is used to perform various backups
 
 . /etc/defaults/backup.conf;
+user_path=$user_path;
 user="$user";
 default_backup_location="$location";
 default_backup_folder="$folder";
+echo "$user_path";
 echo "$user";
 echo "$default_backup_location";
 echo "$default_backup_folder";
@@ -123,19 +125,19 @@ shift $((OPTIND - 1))
 if [ -z $backup_location ]; then
 	path="$default_backup_location"
 else
-	path=$backup_location
+	path="$backup_location"
 fi
 
 if [ -z $file ]; then
     if [ -z $1 ]; then
-        input=/home/$user
-        output=${path}/${user}_"Home"_$(date +%Y-%m-%d_%H%M%S).tar.gz
+        input=$default_backup_folder
+        output=${path}/${user}_"default"_$(date +%Y-%m-%d_%H%M%S).tar.gz
     else
-        if [ ! -d "/home/$user/$1" ]; then
+        if [ ! -d "$user_path$user/$1" ]; then
                 echo "Requested $1 directory doesn't exist."
                 exit 1
         fi
-        input=/home/$user/$1
+        input=$user_path$user/$1
         output=${path}/${user}_${1}_$(date +%Y-%m-%d_%H%M%S).tar.gz
     fi
 fi
@@ -163,7 +165,7 @@ function total_archived_files {
 function backup_file {
     echo "File to back up: $file"
     echo "Backing up..."
-    input=/home/$user/$file
+    input=$user_path$user/$file
     echo "input: $input"
     file_name=$(basename $input)
     output=${path}/${user}_backup_$(date +%Y-%m-%d_%H%M%S)_${file_name}
@@ -198,3 +200,4 @@ if [ -z $file ]; then
     backup_directory
 else
     backup_file
+fi
