@@ -94,6 +94,7 @@ windowsDefault () {
 	fi
 	while [ ! -d $backup ]; do
 		printf "$backup is not a location, try again: ";
+		read res;
 		if [ "$res" == "" ]; then
 		    mkdir "C:/Program/Back Me Up";
 			backup="C:/Program/Back\ Me\ Up";
@@ -166,7 +167,9 @@ function init {
 	fi
 	echo "The backup location is: $backup";
 	echo "The folder to backup is: $folder";
+	echo "";
 	echo "********************************* End **********************************";
+	echo "";
 
 	exit;
 }
