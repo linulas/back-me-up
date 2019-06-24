@@ -8,6 +8,7 @@
 
 ######################## Initialization ########################
 
+# Set alias and path to script and generate config file for Linux and MacOS
 function unixConfig () {
 	sudo cp ./backup.sh /usr/local/bin/backup.sh;
 	sudo touch ./backup.conf;
@@ -26,6 +27,7 @@ function unixConfig () {
 	fi
 }
 
+# Set default backup output location and default folder to back up for Linux and MacOS
 function unixDefault () {
 	printf "Backup location: ";
 	read res;
@@ -69,6 +71,7 @@ function unixDefault () {
 	unixConfig $1 $2 $backup $folder;
 }
 
+# Set path to script and generate config file for Windows
 function windowsConfig () {
 	mkdir $1$2/Scripts;
 	mkdir $1$2/Scripts/"Back Me Up";
@@ -79,6 +82,7 @@ function windowsConfig () {
 	echo folder="$4" >> $1$2/Scripts/"Back Me Up"/backup.conf;
 }
 
+# Set default backup output location and default folder to back up for Windows
 windowsDefault () {
 	printf "Backup output location: ";
 	read res;
@@ -118,6 +122,7 @@ windowsDefault () {
 	windowsConfig "$1" $(whoami) "$backup" "$folder";
 }
 
+# Gets the currently used operating system
 function getOS {
 	case "$OSTYPE" in
   		solaris*) os=SOLARIS ;;
@@ -166,6 +171,7 @@ function init {
 	exit;
 }
 
+# Verifies that there is a config file, if not, initializes setup
 if [ ! -f /etc/defaults/backup.conf ] && 
 [ ! -f C:/Users/$(whoami)/Scripts/'Back Me Up'/backup.conf ] && 
 [ ! -f /etc/default/backup.conf ]; then
@@ -173,6 +179,8 @@ if [ ! -f /etc/defaults/backup.conf ] &&
 fi
 
 ######################## Main Script Start ########################
+
+# Load script info
 . ./info.txt;
 
 echo "";
@@ -185,7 +193,10 @@ echo "Author: $author";
 echo "------------------------";
 echo "";
 
+# Get operating system
 os=$(getOS);
+
+# Get config file
 if [ "$os" == "WINDOWS" ]; then
 	. c:/Users/$(whoami)/Scripts/"Back Me Up"/backup.conf;
 else
@@ -196,6 +207,7 @@ else
 	fi
 fi
 
+# Set default values from config file
 user_path="$user_path";
 user="$user";
 default_backup_location="$location";
@@ -213,7 +225,7 @@ while getopts 'u:f:b:' option; do
     esac
 done
 
-# shift opts away
+# Shift opts away
 shift $((OPTIND - 1))
 
 if [ -z $backup_location ]; then
@@ -222,6 +234,7 @@ else
 	path="$backup_location"
 fi
 
+# Set input and output
 if [ -z $file ]; then
     if [ -z $1 ]; then
         input="$default_backup_folder"
@@ -264,6 +277,7 @@ function total_archived_files {
 	fi
 }
 
+# Backs up a single file
 function backup_file {
     echo "File to back up: $file"
     echo "Backing up..."
@@ -276,6 +290,7 @@ function backup_file {
 	echo "";
 }
 
+# Backs up a given directory
 function backup_directory {
 	src_files="$( total_files $input )"
 	src_directories="$( total_directories $input )"
@@ -316,6 +331,7 @@ function backup_directory {
 	fi
 }
 
+# Back up directory or a single file
 if [ -z $file ]; then
     backup_directory
 else
