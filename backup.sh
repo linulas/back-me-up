@@ -157,9 +157,6 @@ function init {
 		*)		 user_path=/home/ ;;
 	esac
 
-	echo "Path to user folder: $user_path";
-	echo "";
-
 	if [ "$os" == "WINDOWS" ]; then
 		windowsDefault "$user_path";
 	else
