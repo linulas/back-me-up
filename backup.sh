@@ -159,9 +159,9 @@ function init {
 	else
 		unixDefault "$os" "$user_path";
 	fi
-
 	echo "The backup location is: $backup";
 	echo "The folder to backup is: $folder";
+	echo "********************************* End **********************************";
 
 	exit;
 }
@@ -173,9 +173,16 @@ if [ ! -f /etc/defaults/backup.conf ] &&
 fi
 
 ######################## Main Script Start ########################
+. ./info.txt;
 
 echo "";
 echo "****************************** Back Me Up ******************************";
+echo "";
+
+echo "------------------------";
+echo "Version: $version";
+echo "Author: $author";
+echo "------------------------";
 echo "";
 
 os=$(getOS);
@@ -193,7 +200,6 @@ user_path="$user_path";
 user="$user";
 default_backup_location="$location";
 default_backup_folder="$folder";
-echo "$default_backup_location";
 while getopts 'u:f:b:' option; do
     case "${option}" in
 	u)
@@ -220,7 +226,6 @@ if [ -z $file ]; then
     if [ -z $1 ]; then
         input="$default_backup_folder"
         output="${path}/${user}_default_$(date +%Y-%m-%d_%H%M%S).tar.gz"
-		echo "$output"
     else
         if [ ! -d "$user_path$user/$1" ]; then
                 echo "Requested $1 directory doesn't exist."
@@ -246,7 +251,7 @@ function total_archived_directories {
 	if [ "$os" == "WINDOWS" ]; then
         tar -tzf $1 --force-local | grep  /$ | wc -l
 	else
-        tar -tzf $1 | grep  /$ | wc -l
+        sudo tar -tzf $1 | grep  /$ | wc -l
 	fi
 }
 
@@ -255,7 +260,7 @@ function total_archived_files {
 	if [ "$os" == "WINDOWS" ]; then
         tar -tzf $1 --force-local | grep -v /$ | wc -l
 	else
-        tar -tzf $1 | grep -v /$ | wc -l
+        sudo tar -tzf $1 | grep -v /$ | wc -l
 	fi
 }
 
@@ -263,8 +268,7 @@ function backup_file {
     echo "File to back up: $file"
     echo "Backing up..."
     input=$user_path$user/$file
-    echo "input: $input"
-    file_name=$(basename $input)
+    file_name=$(basename "$input")
     output=${path}/${user}_backup_$(date +%Y-%m-%d_%H%M%S)_${file_name}
     cp $input $output
 	echo "";
@@ -273,33 +277,42 @@ function backup_file {
 }
 
 function backup_directory {
-	src_files=$( total_files $input )
-	src_directories=$( total_directories $input )
+	src_files="$( total_files $input )"
+	src_directories="$( total_directories $input )"
 
-	echo "Files to be included: $src_files";
-	echo "Directories to be included: $src_directories";
+	echo "Files to be included: $src_files" | awk '$1=$1';
+	echo "Directories to be included: $src_directories" | awk '$1=$1';
+	echo "";
 	echo "Backing up...";
+	echo "";
 
 	if [ "$os" == "WINDOWS" ]; then
 		tar -czf "$output" "$input" --force-local 2> /dev/null 
 	else
 		sudo tar -czf "$output" "$input" 2> /dev/null 
+		echo "";
 	fi
 	arch_files=$( total_archived_files $output )
 	arch_directories=$( total_archived_directories $output )
 
-	echo "Folders archived: $arch_directories"
-	echo "Files archived: $arch_files"
+	echo "Folders archived: $arch_directories" | awk '$1=$1';
+	echo "Files archived: $arch_files" | awk '$1=$1';
 
 	if [ $src_files -eq $arch_files ]; then
+			echo "";
         	echo "Backup of $input completed."
+			echo "";
         	echo "Details about the output backup file:"
         	ls -l "$output"
 			echo "";
 			echo "********************************* End **********************************";
 			echo "";
 	else
+			echo "";
         	echo "Backup of $input failed"
+			echo "";
+			echo "********************************* End **********************************";
+			echo "";
 	fi
 }
 
