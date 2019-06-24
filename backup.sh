@@ -1,41 +1,32 @@
 #!/bin/bash
 
-############Author############ ############ Website ############
-###### Linus Brännström ###### ###### linusbrannstrom.dev ######
-############################## #################################
+####### Author ####### ############ Website ############ ################ Repository ###############
+## Linus Brännström ## ## https://linusbrannstrom.dev ## ## https://github.com/linulas/back-me-up ##
+###################### ################################# ###########################################
 
+# This bash script is used to perform various backups
 
-# Initializes the script with conf file, script location and alias
-function init {
+######################## Initialization ########################
 
-	echo "";
-	echo "****************************** Back Me Up ******************************";
-	echo "";
-	echo "************ Enter the information, leave blank for default ************";
-	echo "";
+function unixConfig () {
+	sudo cp ./backup.sh /usr/local/bin/backup.sh;
+	sudo touch ./backup.conf;
+	sudo bash -c "echo user_path=$2 >> ./backup.conf";
+	sudo bash -c "echo user=$(whoami) >> ./backup.conf";
+	sudo bash -c "echo location=$3 >> ./backup.conf";
+	sudo bash -c "echo folder=$4 >> ./backup.conf";
+	if [ $1 == MacOS]; then
+		sudo mv ./backup.conf /etc/defaults/backup.conf;
+		sudo bash -c "echo alias backup='/usr/local/bin/backup.sh' >> ~/.bash_profile";
+		. ~/.bash_profile;
+	else
+		sudo mv ./backup.conf /etc/default/backup.conf;
+		sudo bash -c "echo alias backup='/usr/local/bin/backup.sh' >> ~/.bashrc";
+		. ~/.bashrc;
+	fi
+}
 
-	case "$OSTYPE" in
-  		solaris*) os=SOLARIS ;;
-  		darwin*)  os=MacOS ;; 
-  		linux*)   os=LINUX ;;
-  		bsd*)     os=BSD ;;
-  		msys*)    os=WINDOWS ;;
-		*)        os=unknown: $OSTYPE ;;
-	esac
-
-	echo "Operating system: $os";
-	echo "";
-
-	case "$os" in
-		MacOS)   user_path=/Users/ ;;
-		LINUX)   user_path=/home/ ;;
-		WINDOWS) user_path=/C:/Users ;;
-		*)		 user_path=/home/ ;;
-	esac
-
-	echo "Path to user folder: $user_path";
-	echo "";
-
+function unixDefault () {
 	printf "Backup location: ";
 	read res;
 	backup=$res;
@@ -61,7 +52,7 @@ function init {
 	folder=$res;
 
 	if [ "$res" == "" ]; then
-		folder="$user_path"$(whoami);
+		folder="$2"$(whoami);
 	else
 		folder=$res;
 	fi
@@ -69,50 +60,147 @@ function init {
 		printf "$folder is not a location, try again: ";
 		read res;
 		if [ "$res" == "" ]; then
-		folder="$user_path"$(whoami);
+		folder="$2"$(whoami);
 		else
 			folder=$res;
 		fi
 	done
 
+	unixConfig $1 $2 $backup $folder;
+}
+
+function windowsConfig () {
+	mkdir $1$2/Scripts;
+	mkdir $1$2/Scripts/"Back Me Up";
+	cp backup.sh $1$2/Scripts/"Back Me Up"/backup.sh;
+	echo user_path="$1" > $1$2/Scripts/"Back Me Up"/backup.conf;
+	echo user="$2" >> $1$2/Scripts/"Back Me Up"/backup.conf;
+	echo location="$3" >> $1$2/Scripts/"Back Me Up"/backup.conf;
+	echo folder="$4" >> $1$2/Scripts/"Back Me Up"/backup.conf;
+}
+
+windowsDefault () {
+	printf "Backup output location: ";
+	read res;
+	if [ "$res" == "" ]; then
+		mkdir C:/Program/"Back Me Up";
+		backup="C:/Program/Back\ Me\ Up";
+	else
+		backup=$res;
+	fi
+	while [ ! -d $backup ]; do
+		printf "$backup is not a location, try again: ";
+		if [ "$res" == "" ]; then
+		    mkdir "C:/Program/Back Me Up";
+			backup="C:/Program/Back\ Me\ Up";
+		else
+			backup=$res;
+		fi
+	done
+
+	printf "Folder to be backed up: ";
+	read res;
+	if [ "$res" == "" ]; then
+		folder=$1$(whoami);
+	else
+		folder=$res;
+	fi
+	while [ ! -d $folder ]; do
+		printf "$folder is not a location, try again: ";
+		read res;
+		if [ "$res" == "" ]; then
+			folder=$1$(whoami);
+		else
+			folder=$res;
+		fi
+	done
+	
+	windowsConfig "$1" $(whoami) "$backup" "$folder";
+}
+
+function getOS {
+	case "$OSTYPE" in
+  		solaris*) os=SOLARIS ;;
+  		darwin*)  os=MacOS ;; 
+  		linux*)   os=LINUX ;;
+  		bsd*)     os=BSD ;;
+  		msys*)    os=WINDOWS ;;
+		*)        os=unknown: $OSTYPE ;;
+	esac
+	echo $os;
+}
+
+# Initializes the script with conf file, script location and alias
+function init {
+
+	echo "";
+	echo "****************************** Back Me Up ******************************";
+	echo "";
+	echo "************ Enter the information, leave blank for default ************";
+	echo "";
+
+	os=$(getOS);
+
+	echo "Operating system: $os";
+	echo "";
+	
+	case "$os" in
+		MacOS)   user_path=/Users/ ;;
+		LINUX)   user_path=/home/ ;;
+		WINDOWS) user_path=C:/Users/ ;;
+		*)		 user_path=/home/ ;;
+	esac
+
+	echo "Path to user folder: $user_path";
+	echo "";
+
+	if [ "$os" == "WINDOWS" ]; then
+		windowsDefault "$user_path";
+	else
+		unixDefault "$os" "$user_path";
+	fi
+
 	echo "The backup location is: $backup";
 	echo "The folder to backup is: $folder";
 
-	sudo cp ./backup.sh /usr/local/bin/backup.sh;
-	sudo touch ./backup.conf;
-	sudo bash -c "echo user_path=$user_path >> ./backup.conf";
-	sudo bash -c "echo user=$(whoami) >> ./backup.conf";
-	sudo bash -c "echo location=$backup >> ./backup.conf";
-	sudo bash -c "echo folder=$folder >> ./backup.conf";
-	sudo mv ./backup.conf /etc/defaults/backup.conf;
-	sudo bash -c "echo alias backup='/usr/local/bin/backup.sh' >> ~/.bash_profile";
-	. ~/.bash_profile;
 	exit;
 }
 
-if [ ! -f /etc/defaults/backup.conf ]; then
+if [ ! -f /etc/defaults/backup.conf ] && 
+[ ! -f C:/Users/$(whoami)/Scripts/'Back Me Up'/backup.conf ] && 
+[ ! -f /etc/default/backup.conf ]; then
 	init;
 fi
 
-# This bash script is used to perform various backups
+######################## Main Script Start ########################
 
-. /etc/defaults/backup.conf;
-user_path=$user_path;
+echo "";
+echo "****************************** Back Me Up ******************************";
+echo "";
+
+os=$(getOS);
+if [ "$os" == "WINDOWS" ]; then
+	. c:/Users/$(whoami)/Scripts/"Back Me Up"/backup.conf;
+else
+	if [ "$os" == "MacOS" ]; then
+		. /etc/defaults/backup.conf
+	else
+		. /etc/default/backup.conf
+	fi
+fi
+
+user_path="$user_path";
 user="$user";
 default_backup_location="$location";
 default_backup_folder="$folder";
-echo "$user_path";
-echo "$user";
 echo "$default_backup_location";
-echo "$default_backup_folder";
-
 while getopts 'u:f:b:' option; do
     case "${option}" in
 	u)
 	    user="${OPTARG}";;
 	f)
 	    file="${OPTARG}";;
-	l)
+	b)
 	    backup_location="${OPTARG}";;
 	\?)
 	    exit 42;;
@@ -130,8 +218,9 @@ fi
 
 if [ -z $file ]; then
     if [ -z $1 ]; then
-        input=$default_backup_folder
-        output=${path}/${user}_"default"_$(date +%Y-%m-%d_%H%M%S).tar.gz
+        input="$default_backup_folder"
+        output="${path}/${user}_default_$(date +%Y-%m-%d_%H%M%S).tar.gz"
+		echo "$output"
     else
         if [ ! -d "$user_path$user/$1" ]; then
                 echo "Requested $1 directory doesn't exist."
@@ -154,12 +243,20 @@ function total_directories {
 
 # Reports total number of directories archived
 function total_archived_directories {
+	if [ "$os" == "WINDOWS" ]; then
+        tar -tzf $1 --force-local | grep  /$ | wc -l
+	else
         tar -tzf $1 | grep  /$ | wc -l
+	fi
 }
 
 # Reports total number of files archived
 function total_archived_files {
+	if [ "$os" == "WINDOWS" ]; then
+        tar -tzf $1 --force-local | grep -v /$ | wc -l
+	else
         tar -tzf $1 | grep -v /$ | wc -l
+	fi
 }
 
 function backup_file {
@@ -169,18 +266,25 @@ function backup_file {
     echo "input: $input"
     file_name=$(basename $input)
     output=${path}/${user}_backup_$(date +%Y-%m-%d_%H%M%S)_${file_name}
-    sudo cp $input $output
+    cp $input $output
+	echo "";
+	echo "********************************* End **********************************";
+	echo "";
 }
 
 function backup_directory {
 	src_files=$( total_files $input )
 	src_directories=$( total_directories $input )
 
-	echo "Files to be included: $src_files"
-	echo "Directories to be included: $src_directories"
-	echo "Backing up..."
+	echo "Files to be included: $src_files";
+	echo "Directories to be included: $src_directories";
+	echo "Backing up...";
 
-	sudo tar -czf $output $input 2> /dev/null
+	if [ "$os" == "WINDOWS" ]; then
+		tar -czf "$output" "$input" --force-local 2> /dev/null 
+	else
+		sudo tar -czf "$output" "$input" 2> /dev/null 
+	fi
 	arch_files=$( total_archived_files $output )
 	arch_directories=$( total_archived_directories $output )
 
@@ -190,7 +294,10 @@ function backup_directory {
 	if [ $src_files -eq $arch_files ]; then
         	echo "Backup of $input completed."
         	echo "Details about the output backup file:"
-        	ls -l $output
+        	ls -l "$output"
+			echo "";
+			echo "********************************* End **********************************";
+			echo "";
 	else
         	echo "Backup of $input failed"
 	fi
