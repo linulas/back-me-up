@@ -6,7 +6,7 @@ To start using, clone or download the files and go to the folder in a command li
 
 ### Unix (Mac OS & Linux)
 ````
-cd insert_path_to_files_here
+cd insert_path_to_backup.sh_here
 ````
 
 ````
@@ -20,7 +20,7 @@ sudo ./backup.sh
 ### Windows
 To use with Windows, bash needs to be enabled by following [this tutorial](https://www.windowscentral.com/how-install-bash-shell-command-line-windows-10), or alternativley, downlad and install [git bash cmd](https://git-scm.com/downloads).
 
-Start the windows or bass cmd as administrator and navigate to the folder where the script and other files are and launch the setup with:
+Start the windows or bash cmd as administrator and navigate to the folder where the script and other files are and launch the setup with:
 ````
 sh ./backup.sh
 ````
