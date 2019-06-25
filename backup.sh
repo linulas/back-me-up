@@ -16,7 +16,7 @@ function unixConfig () {
 	sudo bash -c "echo user=$(whoami) >> ./backup.conf";
 	sudo bash -c "echo location=$3 >> ./backup.conf";
 	sudo bash -c "echo folder=$4 >> ./backup.conf";
-	if [ $1 == MacOS]; then
+	if [ "$1" == "MacOS" ]; then
 		sudo mv ./backup.conf /etc/defaults/backup.conf;
 		sudo bash -c "echo alias backup='/usr/local/bin/backup.sh' >> ~/.bash_profile";
 		. ~/.bash_profile;
@@ -68,7 +68,9 @@ function unixDefault () {
 		fi
 	done
 
-	unixConfig $1 $2 $backup $folder;
+	echo "";
+
+	unixConfig "$1" "$2" "$backup $folder";
 }
 
 # Set path to script and generate config file for Windows
@@ -120,6 +122,8 @@ windowsDefault () {
 		fi
 	done
 	
+	echo "";
+
 	windowsConfig "$1" $(whoami) "$backup" "$folder";
 }
 
