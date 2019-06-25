@@ -1,3 +1,4 @@
 version="0.6.1"
 author="Linus Brännström"
-patch_notes="This version was dedicated to implement remote backup location by mounting to local system"
+patch_notes="This version (0.6.x) was dedicated to implement remote backup location 
+by mounting to local system, and fix bugs"
