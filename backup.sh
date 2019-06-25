@@ -70,7 +70,7 @@ function unixDefault () {
 
 	echo "";
 
-	unixConfig "$1" "$2" "$backup $folder";
+	unixConfig $1 $2 $backup $folder;
 }
 
 # Set path to script and generate config file for Windows
@@ -186,6 +186,10 @@ fi
 
 # Load script info
 . ./info.txt;
+
+if grep -qs '/Volumes/back_me_up' /proc/mounts; then
+    echo "Remote backup location is mounted."
+fi
 
 echo "";
 echo "****************************** Back Me Up ******************************";
