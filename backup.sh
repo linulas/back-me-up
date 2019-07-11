@@ -6,125 +6,15 @@
 
 # This bash script is used to perform various backups
 
-######################## Initialization ########################
-
-# Set alias and path to script and generate config file for Linux and MacOS
-function unixConfig () {
-	sudo cp ./backup.sh /usr/local/bin/backup.sh;
-	sudo touch ./backup.conf;
-	sudo bash -c "echo user_path=$2 >> ./backup.conf";
-	sudo bash -c "echo user=$(whoami) >> ./backup.conf";
-	sudo bash -c "echo location=$3 >> ./backup.conf";
-	sudo bash -c "echo folder=$4 >> ./backup.conf";
-	if [ "$1" == "MacOS" ]; then
-		sudo mv ./backup.conf /etc/defaults/backup.conf;
-		sudo bash -c "echo alias backup='/usr/local/bin/backup.sh' >> ~/.bash_profile";
-		. ~/.bash_profile;
+# Verifies that there is a config file
+function cfgExists () {
+	if [ ! -f /etc/defaults/backup.conf ] && 
+	[ ! -f C:/Users/$(whoami)/Scripts/'Back Me Up'/backup.conf ] && 
+	[ ! -f /etc/default/backup.conf ]; then
+		echo false;
 	else
-		sudo mv ./backup.conf /etc/default/backup.conf;
-		sudo bash -c "echo alias backup='/usr/local/bin/backup.sh' >> ~/.bashrc";
-		. ~/.bashrc;
+		echo true;
 	fi
-}
-
-# Set default backup output location and default folder to back up for Linux and MacOS
-function unixDefault () {
-	printf "Backup location: ";
-	read res;
-	backup=$res;
-	if [ "$res" == "" ]; then
-		sudo mkdir /etc/back_me_up/;
-		backup=/etc/back_me_up/;
-	else
-		backup=$res;
-	fi
-	while [ ! -d $backup ]; do
-		printf "$backup is not a location, try again: ";
-		read res;
-		if [ "$res" == "" ]; then
-		    sudo mkdir /etc/back_me_up/;
-			backup=/etc/back_me_up/;
-		else
-			backup=$res;
-		fi
-	done
-
-	printf "Folder to be backed up: ";
-	read res;
-	folder=$res;
-
-	if [ "$res" == "" ]; then
-		folder="$2"$(whoami);
-	else
-		folder=$res;
-	fi
-	while [ ! -d $folder ]; do
-		printf "$folder is not a location, try again: ";
-		read res;
-		if [ "$res" == "" ]; then
-		folder="$2"$(whoami);
-		else
-			folder=$res;
-		fi
-	done
-
-	echo "";
-
-	unixConfig $1 $2 $backup $folder;
-}
-
-# Set path to script and generate config file for Windows
-function windowsConfig () {
-	mkdir $1$2/Scripts;
-	mkdir $1$2/Scripts/"Back Me Up";
-	cp backup.sh $1$2/Scripts/"Back Me Up"/backup.sh;
-	echo user_path="$1" > $1$2/Scripts/"Back Me Up"/backup.conf;
-	echo user="$2" >> $1$2/Scripts/"Back Me Up"/backup.conf;
-	echo location="$3" >> $1$2/Scripts/"Back Me Up"/backup.conf;
-	echo folder="$4" >> $1$2/Scripts/"Back Me Up"/backup.conf;
-}
-
-# Set default backup output location and default folder to back up for Windows
-windowsDefault () {
-	printf "Backup output location: ";
-	read res;
-	if [ "$res" == "" ]; then
-		mkdir C:/Program/"Back Me Up";
-		backup="C:/Program/Back\ Me\ Up";
-	else
-		backup=$res;
-	fi
-	while [ ! -d $backup ]; do
-		printf "$backup is not a location, try again: ";
-		read res;
-		if [ "$res" == "" ]; then
-		    mkdir "C:/Program/Back Me Up";
-			backup="C:/Program/Back\ Me\ Up";
-		else
-			backup=$res;
-		fi
-	done
-
-	printf "Folder to be backed up: ";
-	read res;
-	if [ "$res" == "" ]; then
-		folder=$1$(whoami);
-	else
-		folder=$res;
-	fi
-	while [ ! -d $folder ]; do
-		printf "$folder is not a location, try again: ";
-		read res;
-		if [ "$res" == "" ]; then
-			folder=$1$(whoami);
-		else
-			folder=$res;
-		fi
-	done
-	
-	echo "";
-
-	windowsConfig "$1" $(whoami) "$backup" "$folder";
 }
 
 # Gets the currently used operating system
@@ -140,50 +30,13 @@ function getOS {
 	echo $os;
 }
 
-# Initializes the script with conf file, script location and alias
-function init {
-
-	echo "";
-	echo "****************************** Back Me Up ******************************";
-	echo "";
-	echo "************ Enter the information, leave blank for default ************";
-	echo "";
-
-	os=$(getOS);
-
-	echo "Operating system: $os";
-	echo "";
-	
-	case "$os" in
-		MacOS)   user_path=/Users/ ;;
-		LINUX)   user_path=/home/ ;;
-		WINDOWS) user_path=C:/Users/ ;;
-		*)		 user_path=/home/ ;;
-	esac
-
-	if [ "$os" == "WINDOWS" ]; then
-		windowsDefault "$user_path";
-	else
-		unixDefault "$os" "$user_path";
-	fi
-	echo "The backup location is: $backup";
-	echo "The folder to backup is: $folder";
-	echo "";
-	echo "********************************* End **********************************";
-	echo "";
-
-	exit;
-}
-
-# Verifies that there is a config file, if not, initializes setup
-if [ ! -f /etc/defaults/backup.conf ] && 
-[ ! -f C:/Users/$(whoami)/Scripts/'Back Me Up'/backup.conf ] && 
-[ ! -f /etc/default/backup.conf ]; then
-	init;
-fi
-
 ######################## Main Script Start ########################
 
+# Init setup if there's no config file
+if [ ! $(cfgExists) == true ]; then
+	./bmusetup.sh;
+	exit;
+fi
 # Load script info
 . ./info.txt;
 
@@ -216,10 +69,28 @@ else
 fi
 
 # Set default values from config file
+mount="$mount";
 user_path="$user_path";
 user="$user";
-default_backup_location="$location";
+default_backup_location="$backup";
 default_backup_folder="$folder";
+
+echo $user_path
+echo $user
+echo $default_backup_location
+echo $default_backup_folder
+
+if [ "$mount" == "true" ]; then
+	if mount | grep /Volumes/back_me_up > /dev/null; then
+		echo "Remote backup location is mounted."
+	else
+		sudo mkdir /Volumes/back_me_up
+		echo "Backup is not mounted, mounting..."
+		while ! mount | grep /Volumes/back_me_up > /dev/null; do
+			cntRemoteFolder $remote_user $remote_adress $location
+		done
+	fi
+fi
 while getopts 'u:f:b:' option; do
     case "${option}" in
 	u)
@@ -228,6 +99,8 @@ while getopts 'u:f:b:' option; do
 	    file="${OPTARG}";;
 	b)
 	    backup_location="${OPTARG}";;
+	r)
+	    remote_location="${OPTARG}";;
 	\?)
 	    exit 42;;
     esac
