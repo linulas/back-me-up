@@ -2,15 +2,22 @@
 
 # Mounts a remote folder to a local path
 function cntRemoteFolder() {
-    connection="//local;$1@$2/$3"
-    echo $connection
-    sudo mount -t smbfs $connection "$4"
+    if [ "$os" == "WINDOWS" ]; then
+        connection="\\\\$2\\$3 /user:$1 $5"
+        echo $4 $connection
+        net use $4 $connection >NUL
+    else
+        printf "Enter your network password: "
+        connection="//local;$5:$1@$2/$3"
+        echo $connection
+        sudo mount -t smbfs $connection "$4"
+    fi
 }
 
 function isPinged() {
-    os=$(getOS);
+    os=$(getOS)
     if [ "$os" == "WINDOWS" ]; then
-        if ping $1 > NUL; then
+        if ping $1 >NUL; then
             echo true
         else
             echo false
@@ -25,10 +32,19 @@ function isPinged() {
 }
 
 function isMounted() {
-    if mount | grep $1 >/dev/null; then
-        echo true
+    if [ $(getOS) == "WINDOWS" ]; then
+        if [ ! -d $1 ]; then
+            echo true
+        else
+            echo false
+        fi
     else
-        echo false
+        if mount | grep $1 >/dev/null; then
+            echo true
+        else
+            echo false
+        fi
+
     fi
 }
 
@@ -45,8 +61,9 @@ function setupRemoteFolder() {
     done
 
     remote_adress=$res
+    os=$(getOS)
 
-    case "$1" in
+    case "$os" in
     MacOS*)
         mount=/Volumes/back_me_up
         sudo mkdir $mount
@@ -56,8 +73,7 @@ function setupRemoteFolder() {
         sudo mkdir $mount
         ;;
     WINDOWS*)
-        mount=C:/"Program Files"/"Back\ Me\ Up"/mount
-        mkdir C:/"Program Files"/"Back Me Up"/mount
+        mount=z:
         ;;
     esac
 
@@ -68,7 +84,10 @@ function setupRemoteFolder() {
     printf "Resource: "
     read res
     remote_resource=$res
-    cntRemoteFolder $remote_user $remote_adress $remote_resource $mount
+    printf "Enter you network password: "
+    read res
+    password=$res
+    cntRemoteFolder $remote_user $remote_adress $remote_resource $mount $password
     while ! $(isMounted $mount); do
         printf "Could not mount, try again. Username: "
         read res
@@ -76,13 +95,23 @@ function setupRemoteFolder() {
         printf "Resource: "
         read res
         remote_resource=$res
-        cntRemoteFolder $remote_adress $remote_user $remote_resource $mount
+        printf "Enter you network password: "
+        read res
+        password=$res
+        cntRemoteFolder $remote_adress $remote_user $remote_resource $mount $password
     done
-    sudo bash -c "echo mount=true >> ./backup.conf"
-    sudo bash -c "echo location=$mount >> ./backup.conf"
-    sudo bash -c "echo remote_adress=$remote_adress >> ./backup.conf"
-    sudo bash -c "echo remote_user=$remote_user >> ./backup.conf"
-    backup=$mount
+    if [ "$os" == "WINDOWS" ]; then
+        echo mount=true >./backup.conf
+        echo location="$mount" >>./backup.conf
+        echo remote_adress="$remote_adress" >>./backup.conf
+        echo remote_user="$remote_user" >>./backup.conf
+        echo remote_password="$password" >>./backup.conf
+    else
+        sudo bash -c "echo mount=true >> ./backup.conf"
+        sudo bash -c "echo location=$mount >> ./backup.conf"
+        sudo bash -c "echo remote_adress=$remote_adress >> ./backup.conf"
+        sudo bash -c "echo remote_user=$remote_user >> ./backup.conf"
+    fi
 }
 
 # Set alias and path to script and generate config file for Linux and MacOS
@@ -186,10 +215,11 @@ function windowsConfig() {
     mkdir $1$2/Scripts/"Back Me Up"
     cp backup.sh $1$2/Scripts/"Back Me Up"/backup.sh
     cp bmusetup.sh $1$2/Scripts/"Back Me Up"/bmusetup.sh
-    echo user_path="$1" >$1$2/Scripts/"Back Me Up"/backup.conf
-    echo user="$2" >>$1$2/Scripts/"Back Me Up"/backup.conf
-    echo location="$3" >>$1$2/Scripts/"Back Me Up"/backup.conf
-    echo folder="$4" >>$1$2/Scripts/"Back Me Up"/backup.conf
+    echo user_path="$1" >>./backup.conf
+    echo user="$2" >>./backup.conf
+    echo location="$3" >>./backup.conf
+    echo folder="$4" >>./backup.conf
+    mv ./backup.conf $1$2/Scripts/"Back Me Up"/backup.conf
 }
 
 # Set default backup output location and default folder to back up for Windows
