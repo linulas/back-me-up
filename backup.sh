@@ -72,7 +72,7 @@ fi
 mount="$mount";
 user_path="$user_path";
 user="$user";
-default_backup_location="$backup";
+default_backup_location="$location";
 default_backup_folder="$folder";
 
 echo $user_path
