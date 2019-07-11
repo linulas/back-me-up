@@ -8,10 +8,19 @@ function cntRemoteFolder() {
 }
 
 function isPinged() {
-    if ping -c 1 $1 &>/dev/null; then
-        echo true
+    os=$(getOS);
+    if [ "$os" == "WINDOWS" ]; then
+        if ping $1 > NUL; then
+            echo true
+        else
+            echo false
+        fi
     else
-        echo false
+        if ping -c 1 $1 &>/dev/null; then
+            echo true
+        else
+            echo false
+        fi
     fi
 }
 
@@ -76,30 +85,6 @@ function setupRemoteFolder() {
     backup=$mount
 }
 
-function setupUnixLocal() {
-    printf "Backup location: "
-    read res
-    backup=$res
-    if [ "$res" == "" ]; then
-        sudo mkdir /etc/back_me_up/
-        backup=/etc/back_me_up/
-    else
-        backup=$res
-    fi
-    while [ ! -d $backup ]; do
-        printf "$backup is not a location, try again: "
-        read res
-        if [ "$res" == "" ]; then
-            sudo mkdir /etc/back_me_up/
-            backup=/etc/back_me_up/
-        else
-            backup=$res
-        fi
-    done
-    sudo bash -c "echo backup=$backup >> ./backup.conf"
-    sudo bash -c "echo mount=false >> ./backup.conf"
-}
-
 # Set alias and path to script and generate config file for Linux and MacOS
 function unixConfig() {
     sudo cp ./backup.sh /usr/local/bin/backup.sh
@@ -122,7 +107,7 @@ function unixConfig() {
 }
 
 # Set default backup output location and default folder to back up for Linux and MacOS
-function unixDefault() {
+function unixSetup() {
     printf "Use remote folder as backup output (y/n)? "
     read res
     res=$(echo "$res" | tr '[:upper:]' '[:lower:]')
@@ -148,7 +133,27 @@ function unixDefault() {
     if [ "$res" == "y" ] || [ "$res" == "yes" ]; then
         setupRemoteFolder $1
     else
-        setupUnixLocal
+        printf "Backup location: "
+        read res
+        backup=$res
+        if [ "$res" == "" ]; then
+            sudo mkdir /etc/back_me_up/
+            backup=/etc/back_me_up/
+        else
+            backup=$res
+        fi
+        while [ ! -d $backup ]; do
+            printf "$backup is not a location, try again: "
+            read res
+            if [ "$res" == "" ]; then
+                sudo mkdir /etc/back_me_up/
+                backup=/etc/back_me_up/
+            else
+                backup=$res
+            fi
+        done
+        sudo bash -c "echo backup=$backup >> ./backup.conf"
+        sudo bash -c "echo mount=false >> ./backup.conf"
     fi
 
     printf "Folder to be backed up: "
@@ -188,25 +193,51 @@ function windowsConfig() {
 }
 
 # Set default backup output location and default folder to back up for Windows
-windowsDefault() {
-    printf "Backup output location: "
+windowsSetup() {
+    printf "Use remote folder as backup output (y/n)? "
     read res
-    if [ "$res" == "" ]; then
-        mkdir C:/Program/"Back Me Up"
-        backup="C:/Program/Back\ Me\ Up"
+    res=$(echo "$res" | tr '[:upper:]' '[:lower:]')
+    case "$res" in
+    y) ok=true ;;
+    yes) ok=true ;;
+    n) ok=true ;;
+    no) ok=true ;;
+    *) ok=false ;;
+    esac
+    while ! $ok; do
+        printf "Only y, yes, n or no: "
+        read res
+        res=$(echo "$res" | tr '[:upper:]' '[:lower:]')
+        case "$res" in
+        y) ok=true ;;
+        yes) ok=true ;;
+        n) ok=true ;;
+        no) ok=true ;;
+        *) ok=false ;;
+        esac
+    done
+    if [ "$res" == "y" ] || [ "$res" == "yes" ]; then
+        setupRemoteFolder $1
     else
-        backup=$res
-    fi
-    while [ ! -d $backup ]; do
-        printf "$backup is not a location, try again: "
+        printf "Backup output location: "
         read res
         if [ "$res" == "" ]; then
-            mkdir "C:/Program/Back Me Up"
+            mkdir C:/Program/"Back Me Up"
             backup="C:/Program/Back\ Me\ Up"
         else
             backup=$res
         fi
-    done
+        while [ ! -d $backup ]; do
+            printf "$backup is not a location, try again: "
+            read res
+            if [ "$res" == "" ]; then
+                mkdir "C:/Program/Back Me Up"
+                backup="C:/Program/Back\ Me\ Up"
+            else
+                backup=$res
+            fi
+        done
+    fi
 
     printf "Folder to be backed up: "
     read res
@@ -265,9 +296,9 @@ function init() {
     esac
 
     if [ "$os" == "WINDOWS" ]; then
-        windowsDefault "$user_path"
+        windowsSetup "$user_path"
     else
-        unixDefault "$os" "$user_path"
+        unixSetup "$os" "$user_path"
     fi
     echo "The backup location is: $backup"
     echo "The folder to backup is: $folder"
