@@ -8,7 +8,7 @@ function cntRemoteFolder() {
         net use $4 $connection >NUL
     else
         printf "Enter your network password: "
-        connection="//local;$5:$1@$2/$3"
+        connection="//local;$1:$5@$2/$3"
         echo $connection
         sudo mount -t smbfs $connection "$4"
     fi
@@ -111,6 +111,7 @@ function setupRemoteFolder() {
         sudo bash -c "echo location=$mount >> ./backup.conf"
         sudo bash -c "echo remote_adress=$remote_adress >> ./backup.conf"
         sudo bash -c "echo remote_user=$remote_user >> ./backup.conf"
+        sudo bash -c "echo remote_password=$password >> ./backup.conf"
     fi
 }
 
@@ -181,7 +182,7 @@ function unixSetup() {
                 backup=$res
             fi
         done
-        sudo bash -c "echo backup=$backup >> ./backup.conf"
+        sudo bash -c "echo location=$backup >> ./backup.conf"
         sudo bash -c "echo mount=false >> ./backup.conf"
     fi
 
@@ -217,8 +218,7 @@ function windowsConfig() {
     cp bmusetup.sh $1$2/Scripts/"Back Me Up"/bmusetup.sh
     echo user_path="$1" >>./backup.conf
     echo user="$2" >>./backup.conf
-    echo location="$3" >>./backup.conf
-    echo folder="$4" >>./backup.conf
+    echo folder="$3" >>./backup.conf
     mv ./backup.conf $1$2/Scripts/"Back Me Up"/backup.conf
 }
 
@@ -267,6 +267,8 @@ windowsSetup() {
                 backup=$res
             fi
         done
+        echo mount=false >>./backup.conf
+        echo location="$backup" >>./backup.conf
     fi
 
     printf "Folder to be backed up: "
@@ -288,7 +290,7 @@ windowsSetup() {
 
     echo ""
 
-    windowsConfig "$1" $(whoami) "$backup" "$folder"
+    windowsConfig "$1" $(whoami) "$folder"
 }
 
 # Gets the currently used operating system
