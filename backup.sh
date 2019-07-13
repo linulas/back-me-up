@@ -120,7 +120,7 @@ if [ "$mount" == "true" ]; then
 	fi
 fi
 
-while getopts 'a:u:f:b:' option; do
+while getopts 'a:u:f:b:r:' option; do
 	case "${option}" in
 	a)
 		seconds="${OPTARG}"
@@ -251,7 +251,7 @@ function backup_directory() {
 
 # Repeats the backup every x seconds
 if [ $seconds ]; then
-	repeatBackup $seconds
+	repeatBackup $seconds $1
 fi
 
 # Back up directory or a single file
