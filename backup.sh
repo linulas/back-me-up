@@ -157,14 +157,16 @@ fi
 if [ -z $file ]; then
 	if [ -z $1 ]; then
 		input="$default_backup_folder"
-		output="${path}/${user}_default_$(date +%Y-%m-%d_%H%M%S).tar.gz"
+		folder_name=$(basename $default_backup_folder)
+		output="${path}/${user}_${folder_name}_$(date +%Y-%m-%d_%H%M%S).tar.gz"
 	else
 		if [ ! -d "$user_path$user/$1" ]; then
 			echo "Requested $1 directory doesn't exist."
 			exit 1
 		fi
 		input=$user_path$user/$1
-		output=${path}/${user}_${1}_$(date +%Y-%m-%d_%H%M%S).tar.gz
+		folder_name=$(basename $1)
+		output=${path}/${user}_${folder_name}_$(date +%Y-%m-%d_%H%M%S).tar.gz
 	fi
 fi
 
@@ -258,7 +260,7 @@ if [ $seconds ]; then
 	if [ ! -z $alternate_location ]; then
 		automated_location="-b $alternate_location"
 	fi
-	automateBackup $seconds $1 $automated_file $automated_location
+	automateBackup $seconds $automated_file $automated_location $1
 fi
 
 # Back up directory or a single file
