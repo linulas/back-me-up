@@ -4,12 +4,9 @@
 function cntRemoteFolder() {
     if [ "$os" == "WINDOWS" ]; then
         connection="\\\\$2\\$3 /user:$1 $5"
-        echo $4 $connection
         net use $4 $connection >NUL
     else
-        printf "Enter your network password: "
         connection="//local;$1:$5@$2/$3"
-        echo $connection
         sudo mount -t smbfs $connection "$4"
     fi
 }
@@ -52,12 +49,9 @@ function setupRemoteFolder() {
     printf "Enter remote adress: "
     read res
     isPinged=$(isPinged $res)
-    echo $isPinged
     while ! $isPinged; do
         printf "Could not connect find remote host, try again: "
         read res
-        isPinged=$(isPinged $res)
-        echo $isPinged
     done
 
     remote_adress=$res
@@ -77,7 +71,6 @@ function setupRemoteFolder() {
         ;;
     esac
 
-    echo "mount is $mount"
     printf "Username: "
     read res
     remote_user=$res
@@ -105,12 +98,14 @@ function setupRemoteFolder() {
         echo location="$mount" >>./backup.conf
         echo remote_adress="$remote_adress" >>./backup.conf
         echo remote_user="$remote_user" >>./backup.conf
+        echo remote_resource="$remote_resource" >>./backup.conf
         echo remote_password="$password" >>./backup.conf
     else
         sudo bash -c "echo mount=true >> ./backup.conf"
         sudo bash -c "echo location=$mount >> ./backup.conf"
         sudo bash -c "echo remote_adress=$remote_adress >> ./backup.conf"
         sudo bash -c "echo remote_user=$remote_user >> ./backup.conf"
+        sudo bash -c "echo remote_resource=$remote_resource >> ./backup.conf"
         sudo bash -c "echo remote_password=$password >> ./backup.conf"
     fi
 }
@@ -121,7 +116,6 @@ function unixConfig() {
     sudo cp ./bmusetup.sh /usr/local/bin/bmubackup.sh
     sudo bash -c "echo user_path=$2 >> ./backup.conf"
     sudo bash -c "echo user=$(whoami) >> ./backup.conf"
-    #sudo bash -c "echo location=$3 >> ./backup.conf";
     sudo bash -c "echo folder=$3 >> ./backup.conf"
     if [ "$1" == "MacOS" ]; then
         sudo mv ./backup.conf /etc/defaults/backup.conf
@@ -332,7 +326,7 @@ function init() {
     else
         unixSetup "$os" "$user_path"
     fi
-    echo "The backup location is: $backup"
+    echo "The backup location is: $location"
     echo "The folder to backup is: $folder"
     echo ""
     echo "********************************* End **********************************"
