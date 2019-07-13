@@ -49,7 +49,8 @@ function repeatBackup() {
 	if [ "$os" = "WINDOWS" ]; then
 		echo " Windows: $1"
 	else
-		watch -n $1 /usr/local/bin/backup.sh $2 $3 $4 $5 $6 $7
+		sudo chmod 777 /usr/local/bin/backup.sh
+		sudo watch -n $1 /usr/local/bin/backup.sh $2 $3 $4 $5 $6 $7
 	fi
 }
 
@@ -202,7 +203,7 @@ function backup_file() {
 	input=$user_path$user/$file
 	file_name=$(basename "$input")
 	output=${path}/${user}_backup_$(date +%Y-%m-%d_%H%M%S)_${file_name}
-	cp $input $output
+	sudo cp $input $output
 	echo ""
 	echo "********************************* End **********************************"
 	echo ""
@@ -251,7 +252,9 @@ function backup_directory() {
 
 # Repeats the backup every x seconds
 if [ $seconds ]; then
-	repeatBackup $seconds $1
+	automatedFile="-f $file"
+	echo "This is the file to automate: $automatedFile"
+	repeatBackup $seconds $1 $automatedFile
 fi
 
 # Back up directory or a single file
