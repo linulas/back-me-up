@@ -133,6 +133,7 @@ while getopts 'a:u:f:b:r:' option; do
 		;;
 	b)
 		backup_location="${OPTARG}"
+		alternate_location="${OPTARG}"
 		;;
 	r)
 		remote_location="${OPTARG}"
@@ -252,10 +253,12 @@ function backup_directory() {
 # Repeats the backup every x seconds
 if [ $seconds ]; then
 	if [ ! -z $file ]; then
-		automatedFile="-f $file"
-		echo "This is the file to automate: $automatedFile"
+		automated_file="-f $file"
 	fi
-	automateBackup $seconds $1 $automatedFile
+	if [ ! -z $alternate_location ]; then
+		automated_location="-b $alternate_location"
+	fi
+	automateBackup $seconds $1 $automated_file $automated_location
 fi
 
 # Back up directory or a single file
