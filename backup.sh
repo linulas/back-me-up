@@ -45,6 +45,14 @@ function cntRemoteFolder() {
 	fi
 }
 
+function repeatBackup() {
+	if [ "$os" = "WINDOWS" ]; then
+		echo " Windows: $1"
+	else
+		watch -n $1 /usr/local/bin/backup.sh $2 $3 $4 $5 $6 $7
+	fi
+}
+
 # Gets the currently used operating system
 function getOS() {
 	case "$OSTYPE" in
@@ -111,8 +119,12 @@ if [ "$mount" == "true" ]; then
 		cntRemoteFolder $remote_user $remote_adress $remote_resource $location $remote_password
 	fi
 fi
-while getopts 'u:f:b:' option; do
+
+while getopts 'a:u:f:b:' option; do
 	case "${option}" in
+	a)
+		seconds="${OPTARG}"
+		;;
 	u)
 		user="${OPTARG}"
 		;;
@@ -236,6 +248,11 @@ function backup_directory() {
 		echo ""
 	fi
 }
+
+# Repeats the backup every x seconds
+if [ $seconds ]; then
+	repeatBackup $seconds
+fi
 
 # Back up directory or a single file
 if [ -z $file ]; then
