@@ -47,7 +47,10 @@ function cntRemoteFolder() {
 
 function automateBackup() {
 	if [ "$os" = "WINDOWS" ]; then
-		echo " Windows: $1"
+		while [ "1" == "1" ]; do
+			sh c:/Users/$(whoami)/Scripts/"Back Me Up"/backup.sh $2 $3 $4 $5 $6 $7
+			sleep $1
+		done
 	else
 		sudo watch -n $1 /usr/local/bin/backup.sh $2 $3 $4 $5 $6 $7
 	fi
@@ -205,7 +208,11 @@ function backup_file() {
 	input=$user_path$user/$file
 	file_name=$(basename "$input")
 	output=${path}/${user}_backup_$(date +%Y-%m-%d_%H%M%S)_${file_name}
-	sudo cp $input $output
+	if [ "$os" == "WINDOWS" ]; then
+		cp $input $output
+	else
+		sudo cp $input $output
+	fi
 	echo ""
 	echo "********************************* End **********************************"
 	echo ""
