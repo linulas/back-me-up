@@ -6,8 +6,14 @@ function cntRemoteFolder() {
         connection="\\\\$2\\$3 /user:$1 $5"
         net use $4 $connection >NUL
     else
-        connection="//local;$1:$5@$2/$3"
-        sudo mount -t smbfs $connection "$4"
+        if [ "$os" == "LINUX" ]; then
+            connection="//$1/$3 $4 --verbose -o user=$2 password=$5"
+            echo $connection
+            sudo mount -t cifs //$1/$3 $4 --verbose -o user=$2 password=$5
+        else
+            connection="//local;$1:$5@$2/$3"
+            sudo mount -t smbfs $connection "$4"
+        fi
     fi
 }
 
