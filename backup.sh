@@ -76,8 +76,17 @@ if [ ! $(cfgExists) == true ]; then
 	./bmusetup.sh
 	exit
 fi
-# Load script info
-. ./info.txt
+
+# Get config file
+if [ "$os" == "WINDOWS" ]; then
+	. c:/Users/$(whoami)/Scripts/"Back Me Up"/backup.conf
+else
+	if [ "$os" == "MacOS" ]; then
+		. /etc/defaults/backup.conf
+	else
+		. /etc/default/backup.conf
+	fi
+fi
 
 echo ""
 echo "****************************** Back Me Up ******************************"
@@ -93,17 +102,6 @@ echo ""
 os=$(getOS)
 echo "Operating System: $os"
 echo ""
-
-# Get config file
-if [ "$os" == "WINDOWS" ]; then
-	. c:/Users/$(whoami)/Scripts/"Back Me Up"/backup.conf
-else
-	if [ "$os" == "MacOS" ]; then
-		. /etc/defaults/backup.conf
-	else
-		. /etc/default/backup.conf
-	fi
-fi
 
 # Set default values from config file
 mount="$mount"
