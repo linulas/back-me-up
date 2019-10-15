@@ -119,8 +119,11 @@ function setupRemoteFolder() {
 
 # Set alias and path to script and generate config file for Linux and MacOS
 function unixConfig() {
+    . ./info.txt
     sudo cp ./backup.sh /usr/local/bin/backup.sh
     sudo cp ./bmusetup.sh /usr/local/bin/bmubackup.sh
+    sudo bash -c "echo author=$author >> ./backup.conf"
+    sudo bash -c "echo version=$version >> ./backup.conf"
     sudo bash -c "echo user_path=$2 >> ./backup.conf"
     sudo bash -c "echo user=$(whoami) >> ./backup.conf"
     sudo bash -c "echo folder=$3 >> ./backup.conf"
@@ -132,7 +135,7 @@ function unixConfig() {
     else
         sudo mv ./backup.conf /etc/default/backup.conf
         sudo bash -c "echo alias backup='/usr/local/bin/backup.sh' >> ~/.bashrc"
-        sudo bash -c "echo alias backup='/usr/local/bin/bmusetup.sh' >> ~/.bashrc"
+        sudo bash -c "echo alias bmusetup='/usr/local/bin/bmusetup.sh' >> ~/.bashrc"
         . ~/.bashrc
     fi
 }
