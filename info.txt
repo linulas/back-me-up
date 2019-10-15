@@ -1,3 +1,3 @@
-version="0.6.5"
-author="Linus Brännström"
-patch_notes="This version (0.6.x) was dedicated to implementing a automated backup function"
+version="0.6.6"
+author="Linus_Brannstrom"
+patch_notes="This version (0.6.x) was dedicated to fixing bugs and set absolute path as default"
