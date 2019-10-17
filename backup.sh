@@ -121,7 +121,7 @@ if [ "$mount" == "true" ]; then
 	fi
 fi
 
-while getopts 'a:u:f:b:r:' option; do
+while getopts 'a:u:l:k:b:r:' option; do
 	case "${option}" in
 	a)
 		seconds="${OPTARG}"
@@ -131,6 +131,9 @@ while getopts 'a:u:f:b:r:' option; do
 		;;
 	f)
 		file="${OPTARG}"
+		;;
+	l)
+		list=true
 		;;
 	b)
 		backup_location="${OPTARG}"
@@ -148,6 +151,12 @@ done
 # Shift opts away
 shift $((OPTIND - 1))
 
+if [ $list ]; then
+	echo 'jajamen'
+else
+	echo 'nej'
+fi
+
 if [ -z $backup_location ]; then
 	path="$default_backup_location"
 else
@@ -161,11 +170,11 @@ if [ -z $file ]; then
 		folder_name=$(basename $default_backup_folder)
 		output="${path}/${user}_${folder_name}_$(date +%Y-%m-%d_%H%M%S).tar.gz"
 	else
-		if [ ! -d "$user_path$user/$1" ]; then
+		if [ ! -d "$1" ]; then
 			echo "Requested $1 directory doesn't exist."
 			exit 1
 		fi
-		input=$user_path$user/$1
+		input=$1
 		folder_name=$(basename $1)
 		output=${path}/${user}_${folder_name}_$(date +%Y-%m-%d_%H%M%S).tar.gz
 	fi
