@@ -69,117 +69,6 @@ function getOS() {
 	echo $os
 }
 
-######################## Main Script Start ########################
-
-# Init setup if there's no config file
-if [ ! $(cfgExists) == true ]; then
-	./bmusetup.sh
-	exit
-fi
-
-# Get config file
-if [ "$os" == "WINDOWS" ]; then
-	. c:/Users/$(whoami)/Scripts/"Back Me Up"/backup.conf
-else
-	if [ "$os" == "MacOS" ]; then
-		. /etc/defaults/backup.conf
-	else
-		. /etc/default/backup.conf
-	fi
-fi
-
-echo ""
-echo "****************************** Back Me Up ******************************"
-echo ""
-
-echo "------------------------"
-echo "Version: $version"
-echo "Author: $author"
-echo "------------------------"
-echo ""
-
-# Get operating system
-os=$(getOS)
-echo "Operating System: $os"
-echo ""
-
-# Set default values from config file
-mount="$mount"
-user_path="$user_path"
-user="$user"
-default_backup_folder="$folder"
-default_backup_location="$location"
-remote_adress="$remote_adress"
-remote_user="$remote_user"
-remote_resource="$remote_resource"
-remote_password="$remote_password"
-
-if [ "$mount" == "true" ]; then
-	if ! $(isMounted $location); then
-		sudo mkdir $folder
-		cntRemoteFolder $remote_user $remote_adress $remote_resource $location $remote_password
-	fi
-fi
-
-while getopts 'a:u:l:k:b:r:' option; do
-	case "${option}" in
-	a)
-		seconds="${OPTARG}"
-		;;
-	u)
-		user="${OPTARG}"
-		;;
-	f)
-		file="${OPTARG}"
-		;;
-	l)
-		list=true
-		;;
-	b)
-		backup_location="${OPTARG}"
-		alternate_location="${OPTARG}"
-		;;
-	r)
-		remote_location="${OPTARG}"
-		;;
-	\?)
-		exit 42
-		;;
-	esac
-done
-
-# Shift opts away
-shift $((OPTIND - 1))
-
-if [ $list ]; then
-	echo 'jajamen'
-else
-	echo 'nej'
-fi
-
-if [ -z $backup_location ]; then
-	path="$default_backup_location"
-else
-	path="$backup_location"
-fi
-
-# Set input and output
-if [ -z $file ]; then
-	if [ -z $1 ]; then
-		input="$default_backup_folder"
-		folder_name=$(basename $default_backup_folder)
-		output="${path}/${user}_${folder_name}_$(date +%Y-%m-%d_%H%M%S).tar.gz"
-	else
-		if [ ! -d "$1" ]; then
-			echo "Requested $1 directory doesn't exist."
-			exit 1
-		fi
-		input=$1
-		folder_name=$(basename $1)
-		output=${path}/${user}_${folder_name}_$(date +%Y-%m-%d_%H%M%S).tar.gz
-	fi
-fi
-
 # Reports a total number of files for a given directory.
 function total_files() {
 	find $1 -type f | wc -l
@@ -223,10 +112,24 @@ function backup_file() {
 	echo ""
 	echo "********************************* End **********************************"
 	echo ""
+	exit;
 }
 
 # Backs up a given directory
 function backup_directory() {
+	if [ -z $1 ]; then
+		input="$default_backup_folder"
+		folder_name=$(basename $default_backup_folder)
+		output="${path}/${user}_${folder_name}_$(date +%Y-%m-%d_%H%M%S).tar.gz"
+	else
+		if [ ! -d "$user_path$user/$1" ]; then
+			echo "Requested $1 directory doesn't exist."
+			exit 1
+		fi
+		input=$user_path$user/$1
+		folder_name=$(basename $1)
+		output=${path}/${user}_${folder_name}_$(date +%Y-%m-%d_%H%M%S).tar.gz
+	fi
 	src_files="$(total_files $input)"
 	src_directories="$(total_directories $input)"
 
@@ -264,22 +167,107 @@ function backup_directory() {
 		echo "********************************* End **********************************"
 		echo ""
 	fi
+	exit;
 }
 
-# Repeats the backup every x seconds
-if [ $seconds ]; then
-	if [ ! -z $file ]; then
-		automated_file="-f $file"
-	fi
-	if [ ! -z $alternate_location ]; then
-		automated_location="-b $alternate_location"
-	fi
-	automateBackup $seconds $automated_file $automated_location $1
+######################## Main Script Start ########################
+
+# Init setup if there's no config file
+if [ ! $(cfgExists) == true ]; then
+	echo "No config file found, starting setup..."
+	echo ""
+	./bmusetup.sh
+	exit
 fi
+
+# Get config file
+if [ "$os" == "WINDOWS" ]; then
+	. c:/Users/$(whoami)/Scripts/"Back Me Up"/backup.conf
+else
+	if [ "$os" == "MacOS" ]; then
+		. /etc/defaults/backup.conf
+	else
+		. /etc/default/backup.conf
+	fi
+fi
+
+echo ""
+echo "****************************** Back Me Up ******************************"
+echo ""
+
+echo "------------------------"
+echo "Version: $version"
+echo "Author: $author"
+echo "------------------------"
+echo ""
+
+# Get operating system
+os=$(getOS)
+echo "Operating System: $os"
+echo ""
+
+# Set default values from config file
+mount="$mount"
+user_path="$user_path"
+user="$user"
+default_backup_folder="$folder"
+path="$location"
+remote_adress="$remote_adress"
+remote_user="$remote_user"
+remote_resource="$remote_resource"
+remote_password="$remote_password"
+
+if [ "$mount" == "true" ]; then
+	if ! $(isMounted $location); then
+		sudo mkdir $folder
+		cntRemoteFolder $remote_user $remote_adress $remote_resource $location $remote_password
+	fi
+fi
+
+while getopts 'a:u:f:l:b:r:' option; do
+	case "${option}" in
+	b)
+		path="${OPTARG}"
+		alternate_location="${OPTARG}"
+		;;
+	r)
+		remote_location="${OPTARG}"
+		;;
+	u)
+		user="${OPTARG}"
+		;;
+	f)
+		file="${OPTARG}"
+		;;
+	a)
+		seconds="${OPTARG}"
+		# Shift opts away
+		shift $((OPTIND - 1))
+		# Repeats the backup every x seconds
+		if [ ! -z $file ]; then
+			automated_file="-f $file"
+		fi
+		if [ ! -z $alternate_location ]; then
+			automated_location="-b $alternate_location"
+		fi
+		automateBackup $seconds $automated_file $automated_location $1
+		exit
+		;;
+	l)
+		list=true
+		;;
+	\?)
+		exit 42
+		;;
+	esac
+done
+
+# Shift opts away
+shift $((OPTIND - 1))
 
 # Back up directory or a single file
 if [ -z $file ]; then
-	backup_directory
+	backup_directory $1
 else
 	backup_file
 fi
