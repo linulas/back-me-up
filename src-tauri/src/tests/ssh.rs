@@ -9,4 +9,6 @@ async fn test_connection() {
         eprintln!("{e:?}");
     }
     assert!(connection.is_ok());
+
+    connection.unwrap().close().await.unwrap();
 }
