@@ -11,6 +11,16 @@ impl From<openssh::Error> for Error {
     }
 }
 
+pub struct Connection {
+    session: Session,
+}
+
+impl Connection {
+    pub fn new(session: Session) -> Self {
+        Self { session }
+    }
+}
+
 pub async fn to_home_server() -> Result<Session, Error> {
     let user = std::env::var("SSH_USER").expect("SSH_USER must be set");
     let host = std::env::var("SSH_HOST").expect("SSH_HOST must be set");
