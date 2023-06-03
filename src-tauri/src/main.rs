@@ -4,6 +4,9 @@
 mod models;
 mod ssh;
 
+#[cfg(test)]
+mod tests;
+
 fn main() {
     tauri::Builder::default()
         .run(tauri::generate_context!())
