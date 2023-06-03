@@ -1,4 +1,5 @@
 use openssh::{KnownHosts::Strict, Session};
+use openssh_sftp_client::{Sftp, SftpOptions};
 
 #[derive(Debug)]
 pub enum Error {
@@ -12,12 +13,14 @@ impl From<openssh::Error> for Error {
 }
 
 pub struct Connection {
-    session: Session,
+    pub client: Sftp,
 }
 
 impl Connection {
-    pub fn new(session: Session) -> Self {
-        Self { session }
+    pub async fn new(session: Session) -> Self {
+        let options = SftpOptions::new();
+        let client = Sftp::from_session(session, options).await.unwrap();
+        Self { client }
     }
 }
 
