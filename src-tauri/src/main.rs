@@ -3,6 +3,7 @@
 
 use dotenv::dotenv;
 
+mod commands;
 mod models;
 mod ssh;
 
@@ -12,6 +13,7 @@ mod tests;
 fn main() {
     dotenv().ok();
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![commands::list_home_folders])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
