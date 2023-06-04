@@ -1,9 +1,10 @@
 use openssh::{KnownHosts::Strict, Session};
-use openssh_sftp_client::{Sftp, SftpOptions};
+use openssh_sftp_client::{Sftp, SftpOptions, Error as SftpError};
 
 #[derive(Debug)]
 pub enum Error {
     ConnectionFailed(openssh::Error),
+    SftpError(SftpError),
 }
 
 impl From<openssh::Error> for Error {
@@ -12,15 +13,21 @@ impl From<openssh::Error> for Error {
     }
 }
 
+impl From<SftpError> for Error {
+    fn from(e: SftpError) -> Self {
+        Self::SftpError(e)
+    }
+}
+
 pub struct Connection {
     pub client: Sftp,
 }
 
 impl Connection {
-    pub async fn new(session: Session) -> Self {
+    pub async fn new(session: Session) -> Result<Self, Error> {
         let options = SftpOptions::new();
-        let client = Sftp::from_session(session, options).await.unwrap();
-        Self { client }
+        let client = Sftp::from_session(session, options).await?;
+        Ok(Self { client })
     }
 }
 
