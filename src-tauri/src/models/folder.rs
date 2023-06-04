@@ -1,8 +1,9 @@
 use std::fmt::Display;
 
+use serde::Serialize;
 use ts_rs::TS;
 
-#[derive(TS, Debug)]
+#[derive(TS, Debug, Serialize)]
 #[ts(export)]
 pub enum Size {
     B(u64),
@@ -33,7 +34,7 @@ impl Display for Size {
     }
 }
 
-#[derive(TS, Debug)]
+#[derive(TS, Debug, Serialize)]
 #[ts(export)]
 pub struct Folder {
     pub name: String,
