@@ -22,6 +22,7 @@ ts-rs = "6.2.1"
 openssh = "0.9.9"
 dotenv = "0.15.0"
 openssh-sftp-client = { version = "0.13.5", features = ["openssh"] }
+futures = "0.3.28"
 
 [dev-dependencies]
 actix-rt = "*"
