@@ -28,7 +28,7 @@ impl Serialize for Error {
     where
         S: serde::Serializer,
     {
-        format!("{:?}", self).serialize(serializer)
+        format!("{self:?}").serialize(serializer)
     }
 }
 
@@ -41,13 +41,13 @@ pub async fn list_home_folders() -> Result<Vec<Folder>, Error> {
     let mut folders: Vec<Folder> = Vec::new();
 
     for entry in entries {
-        if !entry.file_type().unwrap().is_dir() {
+        if !entry.file_type().expect("entry should be a file").is_dir() {
             continue;
         }
 
         let name = entry.filename().to_str().unwrap_or_default().to_string();
 
-        if name.starts_with(".") {
+        if name.starts_with('.') {
             continue;
         }
 

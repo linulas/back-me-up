@@ -10,7 +10,7 @@ async fn test_connection() {
     }
     assert!(connection.is_ok());
 
-    connection.unwrap().close().await.unwrap();
+    connection.expect("should have a connection to close").close().await.expect("Failed to close");
 }
 
 #[actix_rt::test]
@@ -26,5 +26,5 @@ async fn test_sftp_client() {
     assert!(client.create(path).await.is_ok());
     assert!(client.fs().remove_file(path).await.is_ok());
 
-    client.close().await.unwrap();
+    client.close().await.expect("Failed to close");
 }
