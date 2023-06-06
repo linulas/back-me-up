@@ -20,14 +20,16 @@ impl From<SftpError> for Error {
 }
 
 pub struct Connection {
-    pub client: Sftp,
+    pub sftp_client: Sftp,
+    pub ssh_session: Session,
 }
 
 impl Connection {
     pub async fn new(session: Session) -> Result<Self, Error> {
         let options = SftpOptions::new();
-        let client = Sftp::from_session(session, options).await?;
-        Ok(Self { client })
+        let sftp_client = Sftp::from_session(session, options).await?;
+        let ssh_connection = to_home_server().await?;
+        Ok(Self { sftp_client, ssh_session: ssh_connection })
     }
 }
 

@@ -20,7 +20,7 @@ async fn test_sftp_client() {
     let client = connect::Connection::new(session)
         .await
         .expect("Failed to connect")
-        .client;
+        .sftp_client;
     let path = std::path::Path::new("./test.txt");
 
     assert!(client.create(path).await.is_ok());

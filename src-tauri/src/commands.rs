@@ -1,9 +1,11 @@
+use crate::models::app::{self, Config};
 use crate::models::folder::{Folder, Size};
 use crate::ssh::connect::{to_home_server, Connection, Error as ConnectionError};
 use futures::stream::TryStreamExt;
 use openssh_sftp_client::fs::DirEntry;
 use serde::Serialize;
 use std::path::Path;
+use tauri::State;
 
 #[derive(Debug)]
 pub enum Error {
@@ -33,9 +35,10 @@ impl Serialize for Error {
 }
 
 #[tauri::command]
-pub async fn list_home_folders() -> Result<Vec<Folder>, Error> {
-    let ssh_user = std::env::var("SSH_USER").expect("SSH_USER must be set");
-    let client = Connection::new(to_home_server().await?).await?.client;
+pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<Folder>, Error> {
+    let connection_mutex_guard = state.connection.lock().await;
+    let client = &connection_mutex_guard.as_ref().expect("Must have a sftp connection").sftp_client;
+
     let home_dir = client.fs().open_dir(Path::new("./")).await?;
     let entries: Vec<DirEntry> = home_dir.read_dir().try_collect().await?;
     let mut folders: Vec<Folder> = Vec::new();
@@ -51,7 +54,10 @@ pub async fn list_home_folders() -> Result<Vec<Folder>, Error> {
             continue;
         }
 
-        let path = format!("/home/{ssh_user}/{name}");
+        let config = state.config.lock().await;
+        let user = &config.as_ref().expect("Must have a config").username;
+
+        let path = format!("/home/{user}/{name}" );
 
         folders.push(Folder {
             name,
@@ -61,4 +67,13 @@ pub async fn list_home_folders() -> Result<Vec<Folder>, Error> {
     }
 
     Ok(folders)
+}
+
+#[tauri::command]
+pub async fn set_state(config: Config, state: State<'_, app::MutexState>) -> Result<(), Error> {
+    state.config.lock().await.get_or_insert(config);
+    let connection = Connection::new(to_home_server().await?).await?;
+    state.connection.lock().await.get_or_insert(connection);
+
+    Ok(())
 }

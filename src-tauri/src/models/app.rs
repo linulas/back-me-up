@@ -1,10 +1,11 @@
-use crate::ssh::connect::{to_home_server, Connection};
-use openssh::Session;
+use crate::ssh::connect::Connection;
+use serde::Deserialize;
+use tokio::sync::Mutex;
 use ts_rs::TS;
 
 use super::backup::Backup;
 
-#[derive(TS)]
+#[derive(TS, Deserialize)]
 #[ts(export)]
 pub struct Config {
     pub username: String,
@@ -13,8 +14,7 @@ pub struct Config {
     pub backups: Vec<Backup>,
 }
 
-pub struct State {
-    pub config: Option<Config>,
-    pub session: Option<Session>,
-    pub connection: Option<Connection>,
+pub struct MutexState {
+    pub config: Mutex<Option<Config>>,
+    pub connection: Mutex<Option<Connection>>,
 }

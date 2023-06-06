@@ -1,8 +1,9 @@
+use serde::Deserialize;
 use ts_rs::TS;
 
 use super::folder::Folder;
 
-#[derive(TS)]
+#[derive(TS, Deserialize)]
 #[ts(export)]
 pub struct Backup {
     pub client_folder: Folder,
