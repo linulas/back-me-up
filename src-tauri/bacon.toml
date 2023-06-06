@@ -24,6 +24,7 @@ command = [
   "-W", "clippy::nursery", 
   "-W", "clippy::unwrap_used",
   "-A", "clippy::used-underscore-binding",
+  "-A", "clippy::significant-drop-tightening",
   "-A", "clippy::missing-errors-doc"
 ]
 need_stdout = false
