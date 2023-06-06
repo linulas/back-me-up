@@ -1,11 +1,13 @@
 <script lang="ts">
-	import { invoke } from '@tauri-apps/api/tauri';
 	import { open } from '@tauri-apps/api/dialog';
-	import type { Folder } from '../../src-tauri/bindings/Folder';
-	import type { Backup } from '../../src-tauri/bindings/Backup';
 	import { onMount } from 'svelte';
 	import { extractFileNameFromPath } from '$lib/parse';
 	import Modal from '$lib/modal.svelte';
+	import { init, isRedirect } from './init';
+
+	import type { Folder } from '../../src-tauri/bindings/Folder';
+	import type { Backup } from '../../src-tauri/bindings/Backup';
+	import { goto } from '$app/navigation';
 
 	let backups: Backup[] = [];
 	let server_home_folders: Folder[] = [];
@@ -29,11 +31,13 @@
 	}
 
 	async function deleteBackup(backup: Backup) {
-    // HACK: Must type confirm as any because typescript doesn't type it as a promise
-		const answer: Promise<boolean> = await (confirm as any)('Are you sure you want to delete this backup');
+		// HACK: Must type confirm as any because typescript doesn't type it as a promise
+		const answer: Promise<boolean> = await (confirm as any)(
+			'Are you sure you want to delete this backup'
+		);
 		console.log({ backup, answer }, 'not implemented');
-    if (!answer) return;
-    backups = backups.filter((b) => b !== backup);
+		if (!answer) return;
+		backups = backups.filter((b) => b !== backup);
 	}
 
 	async function createNewBackup() {
@@ -52,15 +56,15 @@
 		};
 	}
 
-	function getServerHomeFolders() {
-		invoke<Folder[]>('list_home_folders')
-			.then((folders) => {
-				server_home_folders = folders;
+	onMount(() => {
+		init()
+			.then((data) => {
+				server_home_folders = data;
 			})
-			.catch((err) => console.error(err));
-	}
-
-	onMount(getServerHomeFolders);
+			.catch((err) => {
+        if (isRedirect(err)) goto(err.location);
+			});
+	});
 </script>
 
 <div>
