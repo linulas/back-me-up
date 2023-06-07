@@ -1,9 +1,9 @@
 import { error, redirect } from '@sveltejs/kit';
 import { invoke } from '@tauri-apps/api/tauri';
-import { exists, createDir, readTextFile, BaseDirectory } from '@tauri-apps/api/fs';
-import { configDir, appConfigDir } from '@tauri-apps/api/path';
-import { config } from '$lib/store';
-import { CONFIG_FILE_NAME } from '$lib/app_files';
+import { exists, createDir, readTextFile, BaseDirectory, writeTextFile } from '@tauri-apps/api/fs';
+import { appConfigDir } from '@tauri-apps/api/path';
+import { backups, config } from '$lib/store';
+import { BACKUPS_FILE_NAME, CONFIG_FILE_NAME } from '$lib/app_files';
 
 import type { Redirect } from '@sveltejs/kit';
 import type { Folder } from '../../src-tauri/bindings/Folder';
@@ -63,6 +63,19 @@ const configFileExist = async () => {
 	}
 };
 
+const setBackups = async () => {
+	const options = { dir: BaseDirectory.AppData };
+	try {
+		if (!(await exists(BACKUPS_FILE_NAME, options))) {
+			writeTextFile(BACKUPS_FILE_NAME, JSON.stringify([]), options);
+		}
+
+		backups.set(JSON.parse(await readTextFile(BACKUPS_FILE_NAME, options)));
+	} catch (e) {
+		console.error(e);
+	}
+};
+
 export const init = async () => {
 	try {
 		if (!(await appConfigDirectoryExists())) {
@@ -76,6 +89,7 @@ export const init = async () => {
 
 		const options = { dir: BaseDirectory.AppConfig };
 		const stored_config: Config = JSON.parse(await readTextFile(CONFIG_FILE_NAME, options));
+    setBackups();
 		config.set(stored_config); // Client app state
 		await setStateOnServer(stored_config);
 		const server_home_folders = await getServerHomeFolders();

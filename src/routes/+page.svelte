@@ -4,16 +4,23 @@
 	import { extractFileNameFromPath } from '$lib/parse';
 	import Modal from '$lib/modal.svelte';
 	import { init, isRedirect } from './init';
+	import { goto } from '$app/navigation';
+	import { invoke } from '@tauri-apps/api/tauri';
+	import { backups } from '$lib/store';
+	import { BaseDirectory, writeTextFile } from '@tauri-apps/api/fs';
+	import { BACKUPS_FILE_NAME } from '$lib/app_files';
 
 	import type { Folder } from '../../src-tauri/bindings/Folder';
 	import type { Backup } from '../../src-tauri/bindings/Backup';
-	import { goto } from '$app/navigation';
-	import { invoke } from '@tauri-apps/api/tauri';
-	import { config } from '$lib/store';
 
 	let server_home_folders: Folder[] = [];
 	let new_folder_to_backup: Folder | undefined;
 	let target_server_folder: String | undefined;
+
+	$: $backups.length > 0 &&
+		writeTextFile(BACKUPS_FILE_NAME, JSON.stringify($backups), {
+			dir: BaseDirectory.AppData
+		});
 
 	const backupDirectory = async (backup: Backup) => {
 		try {
@@ -26,7 +33,7 @@
 		}
 	};
 
-	async function addNewBackup() {
+	const addNewBackup = async () => {
 		const server_folder = server_home_folders.find(
 			(folder) => folder.name === target_server_folder
 		);
@@ -38,29 +45,27 @@
 		};
 
 		if (await backupDirectory(backup)) {
-      config.update(state => {
-        state && (state.backups = [...state.backups, backup]);
-        return state;
-      })
+			backups.update((currentState) => [...currentState, backup]);
 			new_folder_to_backup = undefined;
 			target_server_folder = undefined;
 		}
-	}
+	};
 
-	async function deleteBackup(backup: Backup) {
+	const deleteBackup = async (backup: Backup) => {
 		// HACK: Must type confirm as any because typescript doesn't type it as a promise
 		const answer: Promise<boolean> = await (confirm as any)(
 			'Are you sure you want to delete this backup'
 		);
-		console.log({ backup, answer }, 'not implemented');
 		if (!answer) return;
-      config.update(state => {
-        state && (state.backups = state.backups.filter((b) => b !== backup));
-        return state;
-      })
-	}
+		backups.update((currentState) => currentState.filter((b) => b !== backup));
 
-	async function selectNewFolderToBackup() {
+		// Reactive data write won't run if length is 0, so we have to run manually in that case
+		if ($backups.length === 0) {
+			writeTextFile(BACKUPS_FILE_NAME, JSON.stringify([]), { dir: BaseDirectory.AppData });
+		}
+	};
+
+	const selectNewFolderToBackup = async () => {
 		const local_folder_path = await open({
 			multiple: false,
 			title: 'Select a folder',
@@ -74,7 +79,7 @@
 			path: local_folder_path,
 			size: null
 		};
-	}
+	};
 
 	const refresh = () => {
 		init()
@@ -107,7 +112,7 @@
 			<button on:click={selectNewFolderToBackup}> Add backup </button>
 		</div>
 	</div>
-	{#if $config && $config.backups.length > 0}
+	{#if $backups.length > 0}
 		<div class="backups">
 			<div class="grid grid-heading">
 				<div>
@@ -118,7 +123,7 @@
 					<div>Server folder</div>
 				</div>
 			</div>
-			{#each $config.backups as backup}
+			{#each $backups as backup}
 				<div class="backup grid">
 					<div class="folder">
 						<div>{backup.client_folder.name}</div>
