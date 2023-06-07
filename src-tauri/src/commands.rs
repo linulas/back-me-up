@@ -11,20 +11,20 @@ use tauri::State;
 
 #[derive(Debug)]
 pub enum Error {
-    SftpError(openssh_sftp_client::Error),
-    ConnectionError(ConnectionError),
-    CommandError(String),
+    Sftp(openssh_sftp_client::Error),
+    Connection(ConnectionError),
+    Command(String),
 }
 
 impl From<openssh_sftp_client::Error> for Error {
     fn from(e: openssh_sftp_client::Error) -> Self {
-        Self::SftpError(e)
+        Self::Sftp(e)
     }
 }
 
 impl From<ConnectionError> for Error {
     fn from(e: ConnectionError) -> Self {
-        Self::ConnectionError(e)
+        Self::Connection(e)
     }
 }
 
@@ -104,7 +104,7 @@ pub async fn backup_directory(
     println!("{connection_string}");
 
     let scp = Command::new("scp")
-        .args(&[
+        .args([
             "-r",
             "-P",
             &config.server_port.to_string(),
@@ -117,6 +117,6 @@ pub async fn backup_directory(
     if scp.success() {
         Ok(())
     } else {
-        Err(Error::CommandError(String::from("SCP command failed")))
+        Err(Error::Command(String::from("SCP command failed")))
     }
 }
