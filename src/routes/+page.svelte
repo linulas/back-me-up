@@ -8,26 +8,43 @@
 	import type { Folder } from '../../src-tauri/bindings/Folder';
 	import type { Backup } from '../../src-tauri/bindings/Backup';
 	import { goto } from '$app/navigation';
+	import { invoke } from '@tauri-apps/api/tauri';
+	import { config } from '$lib/store';
 
-	let backups: Backup[] = [];
 	let server_home_folders: Folder[] = [];
 	let new_folder_to_backup: Folder | undefined;
 	let target_server_folder: String | undefined;
 
-	async function submitBackup() {
+	const backupDirectory = async (backup: Backup) => {
+		try {
+			await invoke('backup_directory', { backup });
+			return true;
+		} catch (e) {
+			console.error(e);
+			// TODO: handle error
+			return false;
+		}
+	};
+
+	async function addNewBackup() {
 		const server_folder = server_home_folders.find(
 			(folder) => folder.name === target_server_folder
 		);
 		if (!server_folder) return; // TODO: handle error
-		const backup = {
+		const backup: Backup = {
 			client_folder: new_folder_to_backup!,
 			server_folder,
 			latest_run: null
 		};
-		backups = [...backups, backup];
 
-		new_folder_to_backup = undefined;
-		target_server_folder = undefined;
+		if (await backupDirectory(backup)) {
+      config.update(state => {
+        state && (state.backups = [...state.backups, backup]);
+        return state;
+      })
+			new_folder_to_backup = undefined;
+			target_server_folder = undefined;
+		}
 	}
 
 	async function deleteBackup(backup: Backup) {
@@ -37,10 +54,13 @@
 		);
 		console.log({ backup, answer }, 'not implemented');
 		if (!answer) return;
-		backups = backups.filter((b) => b !== backup);
+      config.update(state => {
+        state && (state.backups = state.backups.filter((b) => b !== backup));
+        return state;
+      })
 	}
 
-	async function createNewBackup() {
+	async function selectNewFolderToBackup() {
 		const local_folder_path = await open({
 			multiple: false,
 			title: 'Select a folder',
@@ -56,15 +76,18 @@
 		};
 	}
 
-	onMount(() => {
+	const refresh = () => {
 		init()
 			.then((data) => {
 				server_home_folders = data;
 			})
 			.catch((err) => {
-        if (isRedirect(err)) goto(err.location);
+				console.log({ err });
+				if (isRedirect(err)) goto(err.location);
 			});
-	});
+	};
+
+	onMount(refresh);
 </script>
 
 <div>
@@ -75,15 +98,16 @@
 				<option value={folder.name}>{folder.name}</option>
 			{/each}
 		</select>
-		<button on:click={submitBackup}>Add</button>
+		<button on:click={addNewBackup}>Add</button>
 	</Modal>
+	<button on:click={refresh}>Refresh</button>
 	<div class="heading">
 		<h1>Your backups</h1>
 		<div>
-			<button on:click={createNewBackup}> Add backup </button>
+			<button on:click={selectNewFolderToBackup}> Add backup </button>
 		</div>
 	</div>
-	{#if backups.length > 0}
+	{#if $config && $config.backups.length > 0}
 		<div class="backups">
 			<div class="grid grid-heading">
 				<div>
@@ -94,13 +118,13 @@
 					<div>Server folder</div>
 				</div>
 			</div>
-			{#each backups as backup}
+			{#each $config.backups as backup}
 				<div class="backup grid">
 					<div class="folder">
 						<div>{backup.client_folder.name}</div>
 					</div>
 					<!-- TODO: add a "backup up to date" state -->
-					<button class="arrow" on:click={() => console.log('not implemented')}>></button>
+					<button class="arrow" on:click={() => backupDirectory(backup)}>></button>
 					<div class="folder">
 						<div>{backup.server_folder.name}</div>
 						<button on:click={() => deleteBackup(backup)}>Del</button>

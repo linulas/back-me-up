@@ -21,7 +21,11 @@ fn main() {
             config: Mutex::default(),
             connection: Mutex::default(),
         })
-        .invoke_handler(tauri::generate_handler![commands::list_home_folders, commands::set_state])
+        .invoke_handler(tauri::generate_handler![
+            commands::list_home_folders,
+            commands::set_state,
+            commands::backup_directory
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

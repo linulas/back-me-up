@@ -1,16 +1,19 @@
 use crate::models::app::{self, Config};
+use crate::models::backup::Backup;
 use crate::models::folder::{Folder, Size};
 use crate::ssh::connect::{to_home_server, Connection, Error as ConnectionError};
 use futures::stream::TryStreamExt;
 use openssh_sftp_client::fs::DirEntry;
 use serde::Serialize;
 use std::path::Path;
+use std::process::Command;
 use tauri::State;
 
 #[derive(Debug)]
 pub enum Error {
     SftpError(openssh_sftp_client::Error),
     ConnectionError(ConnectionError),
+    CommandError(String),
 }
 
 impl From<openssh_sftp_client::Error> for Error {
@@ -37,7 +40,10 @@ impl Serialize for Error {
 #[tauri::command]
 pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<Folder>, Error> {
     let connection_mutex_guard = state.connection.lock().await;
-    let client = &connection_mutex_guard.as_ref().expect("Must have a sftp connection").sftp_client;
+    let client = &connection_mutex_guard
+        .as_ref()
+        .expect("Must have a sftp connection")
+        .sftp_client;
 
     let home_dir = client.fs().open_dir(Path::new("./")).await?;
     let entries: Vec<DirEntry> = home_dir.read_dir().try_collect().await?;
@@ -57,7 +63,7 @@ pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<
         let config = state.config.lock().await;
         let user = &config.as_ref().expect("Must have a config").username;
 
-        let path = format!("/home/{user}/{name}" );
+        let path = format!("/home/{user}/{name}");
 
         folders.push(Folder {
             name,
@@ -76,4 +82,41 @@ pub async fn set_state(config: Config, state: State<'_, app::MutexState>) -> Res
     state.connection.lock().await.get_or_insert(connection);
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn backup_directory(
+    backup: Backup,
+    state: State<'_, app::MutexState>,
+) -> Result<(), Error> {
+    let config_mutex_guard = state.config.lock().await;
+    let config = config_mutex_guard
+        .as_ref()
+        .expect("Must have a sftp connection");
+
+    let connection_string = format!(
+        "{}@{}:{}",
+        config.username,
+        config.server_address.replace("http://", ""),
+        backup.server_folder.path
+    );
+
+    println!("{connection_string}");
+
+    let scp = Command::new("scp")
+        .args(&[
+            "-r",
+            "-P",
+            &config.server_port.to_string(),
+            &backup.client_folder.path,
+            &connection_string,
+        ])
+        .status()
+        .expect("Failed to execute scp");
+
+    if scp.success() {
+        Ok(())
+    } else {
+        Err(Error::CommandError(String::from("SCP command failed")))
+    }
 }
