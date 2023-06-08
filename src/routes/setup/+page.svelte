@@ -22,7 +22,6 @@
 			username,
 			server_address,
 			server_port,
-			backups: []
 		};
 
 		await writeTextFile('app.conf', JSON.stringify(newConfig), { dir: BaseDirectory.AppConfig })

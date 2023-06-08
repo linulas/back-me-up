@@ -22,7 +22,7 @@
     </div>
   </div>
 {/if}
-<style>
+<style lang="scss">
   .modal {
     position: fixed;
     top: 0;
@@ -44,9 +44,10 @@
   }
   .modal-content {
     position: relative;
-    background-color: white;
+    background-color: $clr-background;
     padding: 1rem;
     border-radius: 0.5rem;
     box-shadow: 0 0.5rem 1;
+    min-height: 25vh;
   }
 </style>

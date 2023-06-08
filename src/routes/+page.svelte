@@ -9,26 +9,54 @@
 	import { backups } from '$lib/store';
 	import { BaseDirectory, writeTextFile } from '@tauri-apps/api/fs';
 	import { BACKUPS_FILE_NAME } from '$lib/app_files';
+	import ArrowIcon from '~icons/ion/arrow-forward';
+	import TrashIcon from '~icons/ion/trash';
+	import AddIcon from '~icons/ion/add';
+	import Button from '$lib/button.svelte';
 
 	import type { Folder } from '../../src-tauri/bindings/Folder';
 	import type { Backup } from '../../src-tauri/bindings/Backup';
+	import Select from '$lib/select.svelte';
 
 	let server_home_folders: Folder[] = [];
 	let new_folder_to_backup: Folder | undefined;
-	let target_server_folder: String | undefined;
+	let target_server_folder: string | undefined;
+	let button_states: { [key: string]: ButtonState } = {};
+	let error: App.Error | undefined;
+
+  $: console.log({target_server_folder});
+
+	$: selectItems = server_home_folders.map((folder) => ({
+		title: folder.name,
+		value: folder.name
+	}));
 
 	$: $backups.length > 0 &&
 		writeTextFile(BACKUPS_FILE_NAME, JSON.stringify($backups), {
 			dir: BaseDirectory.AppData
+		}).catch((e) => {
+			console.error(e);
+			error = { message: 'Failed to write backups file' };
 		});
 
+	$: Object.keys(button_states).map((key) => {
+		if (button_states[key] === 'success') {
+			setTimeout(() => {
+				button_states[key] = 'idle';
+			}, 5000);
+		}
+	});
+
 	const backupDirectory = async (backup: Backup) => {
+		const buttonStateKey = `${backup.client_folder.name}_${backup.server_folder.name}`;
+		button_states[buttonStateKey] = 'loading';
 		try {
 			await invoke('backup_directory', { backup });
+			button_states[buttonStateKey] = 'success';
 			return true;
 		} catch (e) {
 			console.error(e);
-			// TODO: handle error
+			button_states[buttonStateKey] = 'error';
 			return false;
 		}
 	};
@@ -37,24 +65,41 @@
 		const server_folder = server_home_folders.find(
 			(folder) => folder.name === target_server_folder
 		);
-		if (!server_folder) return; // TODO: handle error
+
+		console.log({ target_server_folder });
+
+		if (!server_folder) {
+			error = {
+				message: 'Server folder not found'
+			};
+			return;
+		}
+
+		const client_folder_copy = JSON.stringify(new_folder_to_backup);
+		const server_folder_copy = JSON.stringify(target_server_folder);
+
 		const backup: Backup = {
 			client_folder: new_folder_to_backup!,
 			server_folder,
 			latest_run: null
 		};
 
-		if (await backupDirectory(backup)) {
-			backups.update((currentState) => [...currentState, backup]);
-			new_folder_to_backup = undefined;
-			target_server_folder = undefined;
+		new_folder_to_backup = undefined;
+		target_server_folder = undefined;
+
+		backups.update((currentState) => [...currentState, backup]);
+
+		if (!(await backupDirectory(backup))) {
+			new_folder_to_backup = JSON.parse(client_folder_copy);
+			target_server_folder = JSON.parse(server_folder_copy);
+			return;
 		}
 	};
 
 	const deleteBackup = async (backup: Backup) => {
 		// HACK: Must type confirm as any because typescript doesn't type it as a promise
 		const answer: Promise<boolean> = await (confirm as any)(
-			'Are you sure you want to delete this backup'
+			`Are you sure you want to stop backing up ${backup.client_folder.name}?\n\nYour data will still exists on the server, that has to be deleted seperately.`
 		);
 		if (!answer) return;
 		backups.update((currentState) => currentState.filter((b) => b !== backup));
@@ -97,21 +142,31 @@
 
 <div>
 	<Modal open={new_folder_to_backup !== undefined}>
-		<label for="server_home_folders">Select target folder on the server</label>
-		<select id="server_home_folders" bind:value={target_server_folder}>
-			{#each server_home_folders as folder}
-				<option value={folder.name}>{folder.name}</option>
-			{/each}
-		</select>
-		<button on:click={addNewBackup}>Add</button>
+		<div class="modal">
+			<div class="form_group">
+				<label for="server_home_folders">Select target folder on the server</label>
+				<!-- <select id="server_home_folders" bind:value={target_server_folder}> -->
+				<!-- 	{#each server_home_folders as folder} -->
+				<!-- 		<option value={folder.name}>{folder.name}</option> -->
+				<!-- 	{/each} -->
+				<!-- </select> -->
+				<Select items={selectItems} bind:value={target_server_folder} />
+			</div>
+			<Button type="secondary" onClick={addNewBackup}>Backup</Button>
+		</div>
 	</Modal>
-	<button on:click={refresh}>Refresh</button>
+	<!-- <button on:click={refresh}>Refresh</button> -->
 	<div class="heading">
 		<h1>Your backups</h1>
 		<div>
-			<button on:click={selectNewFolderToBackup}> Add backup </button>
+			<Button type="primary" onClick={selectNewFolderToBackup}>
+				New <AddIcon slot="icon" />
+			</Button>
 		</div>
 	</div>
+	{#if error}
+		<p class="error">{error.message}</p>
+	{/if}
 	{#if $backups.length > 0}
 		<div class="backups">
 			<div class="grid grid-heading">
@@ -124,15 +179,29 @@
 				</div>
 			</div>
 			{#each $backups as backup}
+				{@const backupKey = `${backup.client_folder.name}_${backup.server_folder.name}`}
 				<div class="backup grid">
 					<div class="folder">
-						<div>{backup.client_folder.name}</div>
+						<div>
+							<Button type="icon" onClick={() => deleteBackup(backup)} style="padding-left: 0">
+								<TrashIcon color="#ef4444" />
+							</Button>
+							<span>
+								{backup.client_folder.name}
+							</span>
+						</div>
 					</div>
 					<!-- TODO: add a "backup up to date" state -->
-					<button class="arrow" on:click={() => backupDirectory(backup)}>></button>
+					<Button
+						type="icon-with_background"
+						onClick={() => backupDirectory(backup)}
+						style="align-self: center;"
+						state={button_states[backupKey] || 'idle'}
+					>
+						<ArrowIcon slot="icon" color="white" />
+					</Button>
 					<div class="folder">
 						<div>{backup.server_folder.name}</div>
-						<button on:click={() => deleteBackup(backup)}>Del</button>
 					</div>
 				</div>
 			{/each}
@@ -147,6 +216,18 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+	}
+
+	.error {
+		color: $clr-danger;
+	}
+
+	.modal {
+		.form_group {
+			margin-bottom: 1rem;
+			display: flex;
+			flex-direction: column;
+		}
 	}
 
 	.grid-heading {
@@ -165,20 +246,27 @@
 
 	.backup {
 		margin-bottom: 0.5rem;
+		border-bottom: 1px solid $clr-border;
 	}
 
 	.folder {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		border-radius: 5px;
-		padding: 1rem;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.26);
+		padding: 1rem 1rem 1rem 0;
+
+		div {
+			display: flex;
+			align-items: center;
+		}
 	}
 
-	.arrow {
-		display: flex;
-		justify-content: center;
-		align-items: center;
+	h1 {
+		@include text-2xl;
+		margin: $m-2xl;
+		@media screen and (min-width: $media-sm) {
+			@include text-3xl;
+			margin: $m-3xl;
+		}
 	}
 </style>
