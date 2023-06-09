@@ -3,8 +3,6 @@
 
 use tokio::sync::Mutex;
 
-use dotenv::dotenv;
-
 use self::models::app::MutexState;
 
 mod commands;
@@ -15,7 +13,6 @@ mod ssh;
 mod tests;
 
 fn main() {
-    dotenv().ok();
     tauri::Builder::default()
         .manage(MutexState {
             config: Mutex::default(),
