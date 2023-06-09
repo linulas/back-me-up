@@ -1,10 +1,16 @@
+use crate::models::app::Config;
 use crate::ssh::connect;
 use dotenv::dotenv;
 
 #[actix_rt::test]
 async fn test_connection() {
     dotenv().ok();
-    let connection = connect::to_home_server().await;
+    let config = Config {
+        username: std::env::var("SSH_USER").expect("SSH_USER must be set"),
+        server_address: std::env::var("SSH_HOST").expect("SSH_HOST must be set"),
+        server_port: std::env::var("SSH_PORT").expect("SSH_PORT must be set").parse().expect("SSH_PORT must be a number"),
+    };
+    let connection = connect::to_server(config).await;
     if let Err(e) = &connection {
         eprintln!("{e:?}");
     }
@@ -16,8 +22,12 @@ async fn test_connection() {
 #[actix_rt::test]
 async fn test_sftp_client() {
     dotenv().ok();
-    let session = connect::to_home_server().await.expect("Failed to connect");
-    let client = connect::Connection::new(session)
+    let config = Config {
+        username: std::env::var("SSH_USER").expect("SSH_USER must be set"),
+        server_address: std::env::var("SSH_HOST").expect("SSH_HOST must be set"),
+        server_port: std::env::var("SSH_PORT").expect("SSH_PORT must be set").parse().expect("SSH_PORT must be a number"),
+    };
+    let client = connect::Connection::new(config)
         .await
         .expect("Failed to connect")
         .sftp_client;

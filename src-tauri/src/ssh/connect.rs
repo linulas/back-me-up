@@ -1,5 +1,7 @@
 use openssh::{KnownHosts::Strict, Session};
-use openssh_sftp_client::{Sftp, SftpOptions, Error as SftpError};
+use openssh_sftp_client::{Error as SftpError, Sftp, SftpOptions};
+
+use crate::models::app::Config;
 
 #[derive(Debug)]
 pub enum Error {
@@ -25,18 +27,22 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub async fn new(session: Session) -> Result<Self, Error> {
+    pub async fn new(config: Config) -> Result<Self, Error> {
         let options = SftpOptions::new();
-        let sftp_client = Sftp::from_session(session, options).await?;
-        let ssh_connection = to_home_server().await?;
-        Ok(Self { sftp_client, ssh_session: ssh_connection })
+        let sftp_client =
+            Sftp::from_session(to_server(config.clone()).await?, options).await?;
+        let ssh_connection = to_server(config).await?;
+        Ok(Self {
+            sftp_client,
+            ssh_session: ssh_connection,
+        })
     }
 }
 
-pub async fn to_home_server() -> Result<Session, Error> {
-    let user = std::env::var("SSH_USER").expect("SSH_USER must be set");
-    let host = std::env::var("SSH_HOST").expect("SSH_HOST must be set");
-    let port = std::env::var("SSH_PORT").expect("SSH_PORT must be set");
+pub async fn to_server(config: Config) -> Result<Session, Error> {
+    let user = config.username; //std::env::var("SSH_USER").expect("SSH_USER must be set");
+    let host = config.server_address; //std::env::var("SSH_HOST").expect("SSH_HOST must be set");
+    let port = config.server_port; //std::env::var("SSH_PORT").expect("SSH_PORT must be set");
     let session = Session::connect(&format!("ssh://{user}@{host}:{port}"), Strict).await?;
 
     let ls = session.command("ls").output().await?;

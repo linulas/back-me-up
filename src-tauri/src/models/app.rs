@@ -3,7 +3,7 @@ use serde::Deserialize;
 use tokio::sync::Mutex;
 use ts_rs::TS;
 
-#[derive(TS, Deserialize)]
+#[derive(TS, Deserialize, Clone)]
 #[ts(export)]
 pub struct Config {
     pub username: String,

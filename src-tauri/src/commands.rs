@@ -1,7 +1,7 @@
 use crate::models::app::{self, Config};
 use crate::models::backup::Backup;
 use crate::models::folder::{Folder, Size};
-use crate::ssh::connect::{to_home_server, Connection, Error as ConnectionError};
+use crate::ssh::connect::{Connection, Error as ConnectionError};
 use futures::stream::TryStreamExt;
 use openssh_sftp_client::fs::DirEntry;
 use serde::Serialize;
@@ -77,8 +77,8 @@ pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<
 
 #[tauri::command]
 pub async fn set_state(config: Config, state: State<'_, app::MutexState>) -> Result<(), Error> {
-    state.config.lock().await.get_or_insert(config);
-    let connection = Connection::new(to_home_server().await?).await?;
+    state.config.lock().await.get_or_insert(config.clone());
+    let connection = Connection::new(config).await?;
     state.connection.lock().await.get_or_insert(connection);
 
     Ok(())
