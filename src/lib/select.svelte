@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { clientConfig } from './store';
 
 	interface Item {
 		title: string;
@@ -41,7 +42,7 @@
 	}
 </script>
 
-<div class="select">
+<div class={`select ${$clientConfig.theme}`}>
 	<div
 		class="toggle"
 		on:click={toggleOpen}
@@ -85,7 +86,7 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 0.5rem 1rem;
-		background-color: $clr-secondary-action;
+		background-color: $clr-foreground;
 		border: 1px solid $clr-border;
 		cursor: pointer;
 	}
@@ -96,7 +97,7 @@
 		left: 0;
 		width: 100%;
 		list-style: none;
-		background-color: $clr-secondary-action;
+		background-color: $clr-foreground;
 		border: 1px solid $clr-border;
 		padding: 0;
 		margin: 0;
@@ -109,7 +110,18 @@
 		cursor: pointer;
 
 		&:hover {
-			background-color: $clr-secondary-action_hover;
+			background-color: $slate-300;
 		}
 	}
+
+  .dark {
+    .toggle, .options {
+      background-color: $clr-secondary-action_dark;
+      border-color: $clr-border_dark;
+    }
+
+    .options:hover {
+      background-color: $clr-secondary-action_hover_dark;
+    }
+  }
 </style>

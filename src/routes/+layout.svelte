@@ -1,3 +1,43 @@
+<script lang="ts">
+	import { clientConfig } from '$lib/store';
+	import { appWindow } from '@tauri-apps/api/window';
+	import { onMount } from 'svelte';
+
+	onMount(() => {
+		appWindow
+			.theme()
+			.then((theme) => {
+				theme && clientConfig.set({ theme });
+			})
+			.catch((e) => {
+				console.error(e);
+			});
+
+		appWindow.listen('tauri://theme-changed', ({ payload }: any) => {
+			console.log({ payload });
+			clientConfig.update(() => ({ theme: payload }));
+		});
+	});
+</script>
+
+<svelte:head>
+	{#if $clientConfig.theme === 'dark'}
+		<style lang="scss">
+			body {
+				background: $clr-background_dark;
+				color: $clr-text_light;
+			}
+		</style>
+	{:else}
+		<style lang="scss">
+			body {
+				background: $clr-background;
+				color: $clr-text_dark;
+			}
+		</style>
+	{/if}
+</svelte:head>
+
 <main>
 	<slot />
 </main>
@@ -6,8 +46,6 @@
 	@import '../lib/style/mixins.scss';
 
 	:global(body) {
-		background: $clr-background;
-		color: $clr-text_light;
 		font-family: $font-sans-serif;
 		@include text-sm;
 		@media screen and (min-width: $media-sm) {
@@ -23,6 +61,6 @@
 
 	main {
 		width: calc(100% - 2rem);
-    margin: auto;
+		margin: auto;
 	}
 </style>

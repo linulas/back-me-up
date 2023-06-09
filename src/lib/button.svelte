@@ -2,15 +2,16 @@
 	import TadpoleIcon from '~icons/svg-spinners/tadpole';
 	import ErrorIcon from '~icons/ion/alert-circle';
 	import CheckmarkIcon from '~icons/ion/checkmark';
+	import { clientConfig } from './store';
 
 	export let type: ButtonType = 'primary';
 	export let state: ButtonState = 'idle';
 
 	export let onClick: () => void;
-  export let style = "";
+	export let style = '';
 </script>
 
-<button class={`${type} ${state}`} on:click={onClick} {style}>
+<button class={`${type} ${state} ${$clientConfig.theme}`} on:click={onClick} {style}>
 	<slot />
 	{#if $$slots.icon}
 		<span>
@@ -42,9 +43,9 @@
 		&:hover {
 			transform: scale(1.05);
 			background: $clr-primary-action_hover;
-			-webkit-box-shadow: -1px 1px 4px 2px rgba(0, 0, 0, 1);
-			-moz-box-shadow: -1px 1px 4px 2px rgba(0, 0, 0, 1);
-			box-shadow: -1px 1px 4px 2px rgba(0, 0, 0, 1);
+			-webkit-box-shadow: -1px 1px 2px 1px rgba(0, 0, 0, 0.5);
+			-moz-box-shadow: -1px 1px 2px 1px rgba(0, 0, 0, 0.5);
+			box-shadow: -1px 1px 2px 1px rgba(0, 0, 0, 0.5);
 		}
 		&:active {
 			transform: scale(1.1);
@@ -60,6 +61,9 @@
 		&:hover {
 			background: $clr-primary-action_hover;
 		}
+		span {
+			margin-left: 0.5rem;
+		}
 	}
 
 	.secondary {
@@ -68,6 +72,9 @@
 		&:hover {
 			background: $clr-secondary-action_hover;
 		}
+		span {
+			margin-left: 0.5rem;
+		}
 	}
 
 	.icon {
@@ -75,6 +82,7 @@
 		box-shadow: none;
 
 		&:hover {
+			transform: none;
 			background: none;
 			box-shadow: none;
 		}
@@ -82,12 +90,29 @@
 
 	.icon-with_background {
 		background: $clr-secondary-action;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
+		width: 2rem;
+		height: 2rem;
+		border-radius: 50%;
 
 		&:hover {
 			background: $clr-secondary-action_hover;
+		}
+	}
+
+	.dark {
+		&.icon-with_background {
+			background: $clr-secondary-action_dark;
+
+			&:hover {
+				background: $clr-secondary-action_hover_dark;
+			}
+		}
+		&.secondary {
+			background: $clr-secondary-action_dark;
+			color: $clr-text_light;
+			&:hover {
+				background: $clr-secondary-action_hover_dark;
+			}
 		}
 	}
 </style>

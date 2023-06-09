@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+	import { clientConfig } from './store';
   
   export let open: boolean;
   function closeModal() {
@@ -14,10 +15,10 @@
   });
 </script>
 {#if open}
-  <div class="modal">
+  <div class={`modal ${$clientConfig.theme}`}>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <div class="modal-overlay" on:click={closeModal}></div>
-    <div class="modal-content">
+    <div class="overlay" on:click={closeModal}></div>
+    <div class="content">
       <slot />
     </div>
   </div>
@@ -34,7 +35,7 @@
     align-items: center;
     z-index: 9999;
   }
-  .modal-overlay {
+  .overlay {
     position: absolute;
     top: 0;
     left: 0;
@@ -42,12 +43,18 @@
     height: 100%;
     background-color: rgba(0, 0, 0, 0.5);
   }
-  .modal-content {
+  .content {
     position: relative;
     background-color: $clr-background;
     padding: 1rem;
     border-radius: 0.5rem;
     box-shadow: 0 0.5rem 1;
     min-height: 25vh;
+  }
+
+  .dark {
+    .content {
+      background-color: $clr-background_dark;
+    }
   }
 </style>

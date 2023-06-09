@@ -2,29 +2,27 @@
 	import { open } from '@tauri-apps/api/dialog';
 	import { onMount } from 'svelte';
 	import { extractFileNameFromPath } from '$lib/parse';
-	import Modal from '$lib/modal.svelte';
 	import { init, isRedirect } from './init';
 	import { goto } from '$app/navigation';
 	import { invoke } from '@tauri-apps/api/tauri';
-	import { backups } from '$lib/store';
+	import { backups, clientConfig } from '$lib/store';
 	import { BaseDirectory, writeTextFile } from '@tauri-apps/api/fs';
 	import { BACKUPS_FILE_NAME } from '$lib/app_files';
 	import ArrowIcon from '~icons/ion/arrow-forward';
 	import TrashIcon from '~icons/ion/trash';
 	import AddIcon from '~icons/ion/add';
 	import Button from '$lib/button.svelte';
+	import Select from '$lib/select.svelte';
+	import Modal from '$lib/modal.svelte';
 
 	import type { Folder } from '../../src-tauri/bindings/Folder';
 	import type { Backup } from '../../src-tauri/bindings/Backup';
-	import Select from '$lib/select.svelte';
 
 	let server_home_folders: Folder[] = [];
 	let new_folder_to_backup: Folder | undefined;
 	let target_server_folder: string | undefined;
 	let button_states: { [key: string]: ButtonState } = {};
 	let error: App.Error | undefined;
-
-  $: console.log({target_server_folder});
 
 	$: selectItems = server_home_folders.map((folder) => ({
 		title: folder.name,
@@ -65,8 +63,6 @@
 		const server_folder = server_home_folders.find(
 			(folder) => folder.name === target_server_folder
 		);
-
-		console.log({ target_server_folder });
 
 		if (!server_folder) {
 			error = {
@@ -140,22 +136,16 @@
 	onMount(refresh);
 </script>
 
-<div>
+<div class={$clientConfig.theme}>
 	<Modal open={new_folder_to_backup !== undefined}>
 		<div class="modal">
 			<div class="form_group">
 				<label for="server_home_folders">Select target folder on the server</label>
-				<!-- <select id="server_home_folders" bind:value={target_server_folder}> -->
-				<!-- 	{#each server_home_folders as folder} -->
-				<!-- 		<option value={folder.name}>{folder.name}</option> -->
-				<!-- 	{/each} -->
-				<!-- </select> -->
 				<Select items={selectItems} bind:value={target_server_folder} />
 			</div>
 			<Button type="secondary" onClick={addNewBackup}>Backup</Button>
 		</div>
 	</Modal>
-	<!-- <button on:click={refresh}>Refresh</button> -->
 	<div class="heading">
 		<h1>Your backups</h1>
 		<div>
@@ -269,4 +259,10 @@
 			margin: $m-3xl;
 		}
 	}
+
+  .dark {
+    .backup {
+      border-color: $clr-border_dark
+    }
+  }
 </style>

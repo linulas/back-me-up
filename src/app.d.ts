@@ -6,6 +6,10 @@ declare global {
 	type ButtonState = 'idle' | 'loading' | 'success' | 'error';
 
 	namespace App {
+    type Theme = 'light' | 'dark';
+    interface Config {
+      theme: Theme;
+    }
 		// interface Error {}
 		// interface Locals {}
 		// interface PageData {}

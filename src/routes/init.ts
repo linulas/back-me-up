@@ -2,8 +2,8 @@ import { error, redirect } from '@sveltejs/kit';
 import { invoke } from '@tauri-apps/api/tauri';
 import { exists, createDir, readTextFile, BaseDirectory, writeTextFile } from '@tauri-apps/api/fs';
 import { appConfigDir } from '@tauri-apps/api/path';
-import { backups, config } from '$lib/store';
-import { BACKUPS_FILE_NAME, CONFIG_FILE_NAME } from '$lib/app_files';
+import { backups, serverConfig } from '$lib/store';
+import { BACKUPS_FILE_NAME, SERVER_CONFIG_FILE_NAME } from '$lib/app_files';
 
 import type { Redirect } from '@sveltejs/kit';
 import type { Folder } from '../../src-tauri/bindings/Folder';
@@ -56,7 +56,7 @@ const appConfigDirectoryExists = async () => {
 const configFileExist = async () => {
 	const options = { dir: BaseDirectory.AppConfig };
 	try {
-		return await exists(CONFIG_FILE_NAME, options);
+		return await exists(SERVER_CONFIG_FILE_NAME, options);
 	} catch (e) {
 		console.error(e);
 		throw error(500, { message: 'Error checking if config file exists' });
@@ -88,9 +88,9 @@ export const init = async () => {
 		}
 
 		const options = { dir: BaseDirectory.AppConfig };
-		const stored_config: Config = JSON.parse(await readTextFile(CONFIG_FILE_NAME, options));
+		const stored_config: Config = JSON.parse(await readTextFile(SERVER_CONFIG_FILE_NAME, options));
     setBackups();
-		config.set(stored_config); // Client app state
+		serverConfig.set(stored_config); // Client app state
 		await setStateOnServer(stored_config);
 		const server_home_folders = await getServerHomeFolders();
 
