@@ -101,8 +101,6 @@ pub async fn backup_directory(
         backup.server_folder.path
     );
 
-    println!("{connection_string}");
-
     let scp = Command::new("scp")
         .args([
             "-r",
