@@ -23,6 +23,8 @@ openssh = "0.9.9"
 openssh-sftp-client = { version = "0.13.5", features = ["openssh"] }
 futures = "0.3.28"
 tokio = "1.28.2"
+notify = "6.0.0"
+chrono = "0.4.26"
 
 [dev-dependencies]
 actix-rt = "*"
