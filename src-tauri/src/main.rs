@@ -6,6 +6,7 @@ use tokio::sync::Mutex;
 use self::models::app::MutexState;
 
 mod commands;
+mod jobs;
 mod models;
 mod ssh;
 
@@ -21,7 +22,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::list_home_folders,
             commands::set_state,
-            commands::backup_directory
+            commands::backup_directory,
+            commands::backup_on_change
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

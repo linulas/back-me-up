@@ -1,44 +1,16 @@
+use crate::jobs;
 use crate::models::app::{self, Config};
 use crate::models::backup::Backup;
 use crate::models::folder::{Folder, Size};
-use crate::ssh::connect::{Connection, Error as ConnectionError};
+use crate::ssh::{self, connect::Connection};
 use futures::stream::TryStreamExt;
 use openssh_sftp_client::fs::DirEntry;
-use serde::Serialize;
 use std::path::Path;
-use std::process::Command;
+use std::thread;
 use tauri::State;
 
-#[derive(Debug)]
-pub enum Error {
-    Sftp(openssh_sftp_client::Error),
-    Connection(ConnectionError),
-    Command(String),
-}
-
-impl From<openssh_sftp_client::Error> for Error {
-    fn from(e: openssh_sftp_client::Error) -> Self {
-        Self::Sftp(e)
-    }
-}
-
-impl From<ConnectionError> for Error {
-    fn from(e: ConnectionError) -> Self {
-        Self::Connection(e)
-    }
-}
-
-impl Serialize for Error {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        format!("{self:?}").serialize(serializer)
-    }
-}
-
 #[tauri::command]
-pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<Folder>, Error> {
+pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<Folder>, ssh::Error> {
     let connection_mutex_guard = state.connection.lock().await;
     let client = &connection_mutex_guard
         .as_ref()
@@ -76,7 +48,7 @@ pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<
 }
 
 #[tauri::command]
-pub async fn set_state(config: Config, state: State<'_, app::MutexState>) -> Result<(), Error> {
+pub async fn set_state(config: Config, state: State<'_, app::MutexState>) -> Result<(), ssh::Error> {
     state.config.lock().await.get_or_insert(config.clone());
     let connection = Connection::new(config).await?;
     state.connection.lock().await.get_or_insert(connection);
@@ -88,33 +60,33 @@ pub async fn set_state(config: Config, state: State<'_, app::MutexState>) -> Res
 pub async fn backup_directory(
     backup: Backup,
     state: State<'_, app::MutexState>,
-) -> Result<(), Error> {
+) -> Result<(), ssh::Error> {
     let config_mutex_guard = state.config.lock().await;
     let config = config_mutex_guard
         .as_ref()
         .expect("Must have a sftp connection");
 
-    let connection_string = format!(
-        "{}@{}:{}",
-        config.username,
-        config.server_address.replace("http://", ""),
-        backup.server_folder.path
-    );
+    Ok(ssh::commands::backup_to_server(&backup, config)?)
+}
 
-    let scp = Command::new("scp")
-        .args([
-            "-r",
-            "-P",
-            &config.server_port.to_string(),
-            &backup.client_folder.path,
-            &connection_string,
-        ])
-        .status()
-        .expect("Failed to execute scp");
+#[tauri::command]
+pub async fn backup_on_change(
+    state: State<'_, app::MutexState>,
+    backup: Backup,
+) -> Result<(), ssh::Error> {
+    let config_mutex_guard = state.config.lock().await;
+    let config = config_mutex_guard
+        .as_ref()
+        .expect("Must have a sftp connection")
+        .clone();
 
-    if scp.success() {
-        Ok(())
-    } else {
-        Err(Error::Command(String::from("SCP command failed")))
-    }
+    thread::spawn(move || {
+        let result = jobs::backup::directory_on_change(backup, config);
+
+        if let Err(e) = result {
+            println!("watch error: {e:?}");
+        }
+    });
+
+    Ok(())
 }
