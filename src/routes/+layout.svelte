@@ -1,7 +1,12 @@
 <script lang="ts">
-	import { clientConfig } from '$lib/store';
+	import { backups, clientConfig } from '$lib/store';
+	import { invoke } from '@tauri-apps/api/tauri';
 	import { appWindow } from '@tauri-apps/api/window';
 	import { onMount } from 'svelte';
+
+	$: if ($backups.length > 0) {
+		$backups.map((backup) => invoke('backup_on_change', { backup }));
+	}
 
 	onMount(() => {
 		appWindow

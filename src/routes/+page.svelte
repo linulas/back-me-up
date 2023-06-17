@@ -98,11 +98,17 @@
 			`Are you sure you want to stop backing up ${backup.client_folder.name}?\n\nYour data will still exists on the server, that has to be deleted seperately.`
 		);
 		if (!answer) return;
-		backups.update((currentState) => currentState.filter((b) => b !== backup));
 
-		// Reactive data write won't run if length is 0, so we have to run manually in that case
-		if ($backups.length === 0) {
-			writeTextFile(BACKUPS_FILE_NAME, JSON.stringify([]), { dir: BaseDirectory.AppData });
+		try {
+			await invoke('terminate_background_backup', { backup });
+			backups.update((currentState) => currentState.filter((b) => b !== backup));
+
+			// Reactive data write won't run if length is 0, so we have to run manually in that case
+			if ($backups.length === 0) {
+				writeTextFile(BACKUPS_FILE_NAME, JSON.stringify([]), { dir: BaseDirectory.AppData });
+			}
+		} catch (e) {
+			console.error(e);
 		}
 	};
 
@@ -260,9 +266,9 @@
 		}
 	}
 
-  .dark {
-    .backup {
-      border-color: $clr-border_dark
-    }
-  }
+	.dark {
+		.backup {
+			border-color: $clr-border_dark;
+		}
+	}
 </style>

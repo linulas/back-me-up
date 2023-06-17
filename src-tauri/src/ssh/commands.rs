@@ -37,7 +37,7 @@ pub fn delete_from_server(backup: &Backup, config: &Config) -> Result<(), Error>
         config.server_address.replace("http://", ""),
     );
 
-    let delete_command_string = format!("rm -rf '{}'", backup.server_folder.path);
+    let delete_command_string = format!("rm -rf {}", backup.server_folder.path);
 
     let ssh_delete = Command::new("ssh")
         .args([

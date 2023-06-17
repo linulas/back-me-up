@@ -3,7 +3,7 @@ use ts_rs::TS;
 
 use super::folder::Folder;
 
-#[derive(TS, Deserialize)]
+#[derive(TS, Deserialize, Clone)]
 #[ts(export)]
 pub struct Backup {
     pub client_folder: Folder,
