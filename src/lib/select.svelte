@@ -17,8 +17,6 @@
 		isOpen = false;
 	}
 
-	$: console.log(value);
-
 	let outsideClickListener: (event: MouseEvent) => void;
 
 	onMount(() => {
