@@ -173,7 +173,7 @@ pub fn backup_on_change(state: State<'_, app::MutexState>, backup: Backup) -> Re
         return Ok(());
     };
 
-    let pool = state.pool.lock()?;
+    let mut pool = state.pool.lock()?;
     let state_config = &state.config.lock()?;
     let config_to_move_into_thread = if let Some(config) = state_config.as_ref() {
         config.clone()

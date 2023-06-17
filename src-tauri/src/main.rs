@@ -12,7 +12,7 @@ mod ssh;
 mod tests;
 
 fn main() {
-    let pool = jobs::Pool::new(10);
+    let pool = jobs::Pool::new(None);
 
     tauri::Builder::default()
         .manage(MutexState {

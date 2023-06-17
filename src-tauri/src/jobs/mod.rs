@@ -53,6 +53,7 @@ pub enum Message {
 pub struct Pool {
     workers: Vec<Worker>,
     sender: Sender<Message>,
+    receiver: Arc<Mutex<Receiver<Message>>>,
 }
 
 pub trait FnBox {
@@ -74,26 +75,52 @@ pub struct Arguments {
 type Job = Box<dyn FnBox + Send + 'static>;
 
 impl Pool {
-    pub fn new(size: usize) -> Self {
-        assert!(size > 0);
-        let mut workers = Vec::with_capacity(size);
+    pub fn new(size: Option<usize>) -> Self {
+        let mut workers = size.map_or_else(Vec::new, Vec::with_capacity);
         let (sender, receiver) = mpsc::channel();
 
         let receiver = Arc::new(Mutex::new(receiver));
 
-        for id in 0..size {
-            workers.push(Worker::new(id, Arc::clone(&receiver)));
+        if let Some(size) = size {
+            for id in 0..size {
+                workers.push(Worker::new(id, Arc::clone(&receiver)));
+            }
         }
 
-        Self { workers, sender }
+        Self { workers, sender, receiver }
     }
-    pub fn execute<F>(&self, f: F) -> Result<(), Error>
+    pub fn execute<F>(&mut self, f: F) -> Result<(), Error>
     where
         F: FnOnce(Arguments) + Send + 'static,
     {
         let job = Box::new(f);
 
+        if !self.has_available_worker() {
+           self.add_worker(); 
+        }
+
         Ok(self.sender.send(Message::New(job))?)
+    }
+
+    fn has_available_worker(&self) -> bool {
+        if self.workers.is_empty() {
+            return false;
+        };
+
+        for worker in &self.workers {
+            if worker.thread.is_none() {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn add_worker(&mut self) {
+        let id = self.workers.len() + 1;
+        println!("Adding new worker width id {id}");
+
+        self.workers.push(Worker::new(id, Arc::clone(&self.receiver)));
     }
 
     pub fn terminate_worker(
@@ -147,8 +174,8 @@ impl Drop for Pool {
     fn drop(&mut self) {
         println!("Sending terminate message to all workers.");
 
-        for i in &mut self.workers {
-            if let Err(e) = self.sender.send(Message::Terminate(i.id)) {
+        for worker in &mut self.workers {
+            if let Err(e) = self.sender.send(Message::Terminate(worker.id)) {
                 println!("Error sending terminate message: {e:?}");
             }
         }
