@@ -27,7 +27,16 @@
 			},
 			"path": {
 				"all": true
+			},
+			"window": {
+				"create": true,
+				"show": true,
+				"close": true
 			}
+		},
+		"systemTray": {
+			"iconPath": "icons/icon.png",
+			"iconAsTemplate": true
 		},
 		"bundle": {
 			"active": true,
@@ -70,6 +79,7 @@
 		},
 		"windows": [
 			{
+				"label": "main",
 				"fullscreen": false,
 				"height": 600,
 				"resizable": true,

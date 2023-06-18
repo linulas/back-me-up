@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { open } from '@tauri-apps/api/dialog';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { extractFileNameFromPath } from '$lib/parse';
 	import { init, isRedirect } from './init';
 	import { goto } from '$app/navigation';
 	import { invoke } from '@tauri-apps/api/tauri';
-	import { backups, clientConfig } from '$lib/store';
+	import { backups, clientConfig, clientDefaults, serverConfig } from '$lib/store';
 	import { BaseDirectory, writeTextFile } from '@tauri-apps/api/fs';
 	import { BACKUPS_FILE_NAME } from '$lib/app_files';
 	import ArrowIcon from '~icons/ion/arrow-forward';
@@ -14,6 +14,7 @@
 	import Button from '$lib/button.svelte';
 	import Select from '$lib/select.svelte';
 	import Modal from '$lib/modal.svelte';
+	import { listen } from '@tauri-apps/api/event';
 
 	import type { Folder } from '../../src-tauri/bindings/Folder';
 	import type { Backup } from '../../src-tauri/bindings/Backup';
@@ -43,6 +44,13 @@
 				button_states[key] = 'idle';
 			}, 5000);
 		}
+	});
+
+	const unlisten = listen<string>('reload', () => {
+		backups.set([]);
+		clientConfig.set(clientDefaults);
+		serverConfig.set(undefined);
+		refresh();
 	});
 
 	const backupDirectory = async (backup: Backup) => {
@@ -128,18 +136,22 @@
 		};
 	};
 
-	const refresh = () => {
+	const refresh = async () => {
 		init()
 			.then((data) => {
 				server_home_folders = data;
 			})
 			.catch((err) => {
-				console.log({ err });
-				if (isRedirect(err)) goto(err.location);
+				const redirect = isRedirect(err);
+				console.log({ redirect });
+				if (redirect) goto(err.location);
 			});
 	};
 
 	onMount(refresh);
+	onDestroy(async () => {
+		(await unlisten)();
+	});
 </script>
 
 <div class={$clientConfig.theme}>

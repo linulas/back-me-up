@@ -59,8 +59,6 @@
 
     if(error) return;
 
-		console.log({error});
-
 		try {
 			await writeTextFile(SERVER_CONFIG_FILE_NAME, JSON.stringify(newConfig), {
 				dir: BaseDirectory.AppConfig

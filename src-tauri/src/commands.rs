@@ -234,3 +234,36 @@ pub fn terminate_background_backup(
         Err(Error::Job(error))
     }
 }
+
+#[tauri::command]
+pub async fn reset(state: State<'_, app::MutexState>) -> Result<(), Error> {
+    state.connection.lock().await.take();
+    state.config.lock()?.take();
+    let mut pool = state.pool.lock()?;
+    let mut jobs = state.jobs.lock()?;
+    for (job_id, worker) in jobs.iter() {
+        let client_folder_path = job_id.split('_').nth(0).unwrap();
+        println!("Terminating worker: {worker:?}\nPath: {client_folder_path}");
+
+        if let Err(why) = pool.terminate_worker(*worker, || {
+            let file_path = format!("{}/.bmu_event_trigger", client_folder_path);
+
+            if let Err(e) = Command::new("touch").args([&file_path]).status() {
+                println!("Error: {e:?}");
+            }
+
+            if let Err(e) = Command::new("rm").args([&file_path]).status() {
+                println!("Error: {e:?}");
+            }
+        }) {
+            println!("Error terminating worker: {why}");
+            let error = jobs::Error::Terminate(why.to_string());
+            return Err(Error::Job(error));
+        };
+    }
+
+    jobs.clear();
+    drop(pool);
+
+    Ok(())
+}
