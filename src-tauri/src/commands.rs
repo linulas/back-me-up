@@ -238,15 +238,14 @@ pub fn terminate_background_backup(
 #[tauri::command]
 pub async fn reset(state: State<'_, app::MutexState>) -> Result<(), Error> {
     state.connection.lock().await.take();
-    state.config.lock()?.take();
+    let jobs = state.jobs.lock()?;
     let mut pool = state.pool.lock()?;
-    let mut jobs = state.jobs.lock()?;
-    for (job_id, worker) in jobs.iter() {
-        let client_folder_path = job_id.split('_').nth(0).unwrap();
-        println!("Terminating worker: {worker:?}\nPath: {client_folder_path}");
+
+    jobs.iter().for_each(|(job_id, worker)| {
+        let client_folder_path = job_id.split('_').next().expect("Could not split job_id");
 
         if let Err(why) = pool.terminate_worker(*worker, || {
-            let file_path = format!("{}/.bmu_event_trigger", client_folder_path);
+            let file_path = format!("{client_folder_path}/.bmu_event_trigger");
 
             if let Err(e) = Command::new("touch").args([&file_path]).status() {
                 println!("Error: {e:?}");
@@ -257,13 +256,12 @@ pub async fn reset(state: State<'_, app::MutexState>) -> Result<(), Error> {
             }
         }) {
             println!("Error terminating worker: {why}");
-            let error = jobs::Error::Terminate(why.to_string());
-            return Err(Error::Job(error));
         };
-    }
+    });
 
-    jobs.clear();
-    drop(pool);
+    state.config.lock()?.take();
+    state.jobs.lock()?.clear();
+    drop(state.pool.lock()?);
 
     Ok(())
 }

@@ -2,13 +2,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use self::models::app::MutexState;
 use std::sync::{Arc, Mutex};
+use tauri::SystemTray;
 use tauri::{CustomMenuItem, SystemTrayMenu, SystemTrayMenuItem};
-use tauri::{Manager, SystemTray, SystemTrayEvent};
 
 mod commands;
 mod jobs;
 mod models;
 mod ssh;
+mod tray;
 
 #[cfg(test)]
 mod tests;
@@ -22,7 +23,7 @@ fn main() {
         .add_item(settings)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit);
-    let tray = SystemTray::new().with_menu(tray_menu);
+    let app_tray = SystemTray::new().with_menu(tray_menu);
     let pool = jobs::Pool::new(None);
 
     tauri::Builder::default()
@@ -41,53 +42,13 @@ fn main() {
             commands::drop_pool,
             commands::reset,
         ])
-        .system_tray(tray)
-        .on_system_tray_event(|app, event| match event {
-            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-                "open" => {
-                    if let Some(main_window) = app.get_window("main") {
-                        if let Err(e) = main_window.set_focus() {
-                            println!("failed to focus main window: {e:?}");
-                        }
-                    } else {
-                        tauri::WindowBuilder::new(
-                            &app.app_handle(),
-                            "main",
-                            tauri::WindowUrl::App("index.html".into()),
-                        )
-                        .title("BMU")
-                        .resizable(true)
-                        .fullscreen(false)
-                        .inner_size(800.0, 600.0)
-                        .build()
-                        .expect("failed to build main window");
-                    };
-                }
-                "settings" => {
-                    tauri::WindowBuilder::new(
-                        &app.app_handle(),
-                        "settings",
-                        tauri::WindowUrl::App("/settings".into()),
-                    )
-                    .title("Settings")
-                    .resizable(false)
-                    .inner_size(600.0, 400.0)
-                    .build()
-                    .expect("failed to build settings window");
-                }
-                "quit" => {
-                    std::process::exit(0);
-                }
-                _ => {}
-            },
-            _ => {}
-        })
+        .system_tray(app_tray)
+        .on_system_tray_event(tray::handle_system_tray_event)
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_, event| match event {
-            tauri::RunEvent::ExitRequested { api, .. } => {
+        .run(|_, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
                 api.prevent_exit();
             }
-            _ => {}
         });
 }
