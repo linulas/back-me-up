@@ -2,7 +2,7 @@
 // for information about these interfaces
 declare global {
 
-	type ButtonType = 'primary' | 'secondary' | 'icon' | 'icon-with_background';
+	type ButtonType = 'primary' | 'secondary' | 'danger' | 'icon' | 'icon-with_background';
 	type ButtonState = 'idle' | 'loading' | 'success' | 'error';
 
 	namespace App {

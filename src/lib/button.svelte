@@ -77,6 +77,17 @@
 		}
 	}
 
+	.danger {
+		background: $clr-danger;
+		color: $clr-text_light;
+		&:hover {
+			background: $red-600;
+		}
+		span {
+			margin-left: 0.5rem;
+		}
+	}
+
 	.icon {
 		background: transparent;
 		box-shadow: none;
