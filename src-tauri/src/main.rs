@@ -14,7 +14,6 @@ mod ssh;
 mod tests;
 
 fn main() {
-    // here `"quit".to_string()` defines the menu item id, and the second parameter is the menu item label.
     let open_dashboard = CustomMenuItem::new("open".to_string(), "Open dashboard");
     let settings = CustomMenuItem::new("settings".to_string(), "Settings");
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");
@@ -44,27 +43,6 @@ fn main() {
         ])
         .system_tray(tray)
         .on_system_tray_event(|app, event| match event {
-            SystemTrayEvent::LeftClick {
-                position: _,
-                size: _,
-                ..
-            } => {
-                println!("system tray received a left click");
-            }
-            SystemTrayEvent::RightClick {
-                position: _,
-                size: _,
-                ..
-            } => {
-                println!("system tray received a right click");
-            }
-            SystemTrayEvent::DoubleClick {
-                position: _,
-                size: _,
-                ..
-            } => {
-                println!("system tray received a double click");
-            }
             SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
                 "open" => {
                     if let Some(main_window) = app.get_window("main") {
@@ -88,7 +66,7 @@ fn main() {
                 "settings" => {
                     tauri::WindowBuilder::new(
                         &app.app_handle(),
-                        "settings", /* the unique window label */
+                        "settings",
                         tauri::WindowUrl::App("/settings".into()),
                     )
                     .title("Settings")
