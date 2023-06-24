@@ -26,12 +26,7 @@ pub async fn to_server(config: Config) -> Result<Session, Error> {
     let host = config.server_address;
     let port = config.server_port;
     let session = Session::connect(&format!("ssh://{user}@{host}:{port}"), Strict).await?;
-
-    let ls = session.command("ls").output().await?;
-    eprintln!(
-        "Connected as user {user}\n\n{}",
-        String::from_utf8(ls.stdout).expect("server output was not valid UTF-8")
-    );
+    eprintln!("Connected as user {user}\n");
 
     let whoami = session.command("whoami").output().await?;
     assert_eq!(whoami.stdout, format!("{user}\n").into_bytes());
