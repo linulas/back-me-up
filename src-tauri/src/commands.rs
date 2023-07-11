@@ -128,9 +128,17 @@ pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<
 
 #[tauri::command]
 pub async fn set_state(config: Config, state: State<'_, app::MutexState>) -> Result<(), Error> {
-    state.config.lock()?.get_or_insert(config.clone());
+    _ = state.config.lock()?.insert(config.clone());
     let connection = Connection::new(config).await?;
     state.connection.lock().await.get_or_insert(connection);
+
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn set_config(config: Config, state: State<'_, app::MutexState>) -> Result<(), Error> {
+    _ = state.config.lock()?.insert(config);
 
     Ok(())
 }
@@ -162,6 +170,20 @@ pub fn drop_pool(state: State<'_, app::MutexState>) -> Result<(), Error> {
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub fn backup_on_change(state: State<'_, app::MutexState>, backup: Backup) -> Result<(), Error> {
+    let state_config = &state.config.lock()?;
+    let config_to_move_into_thread = if let Some(config) = state_config.as_ref() {
+        config.clone()
+    } else {
+        let error = app::Error::Config(String::from("No config detected"));
+        return Err(Error::App(error));
+    };
+
+    if !config_to_move_into_thread.allow_background_backup {
+        return Err(Error::App(app::Error::Config(String::from(
+            "Background backup is disabled",
+        ))));
+    }
+
     let job_id = jobs::id_from_backup(&backup);
     let jobs = Arc::clone(&state.jobs);
 
@@ -174,14 +196,6 @@ pub fn backup_on_change(state: State<'_, app::MutexState>, backup: Backup) -> Re
     };
 
     let mut pool = state.pool.lock()?;
-    let state_config = &state.config.lock()?;
-    let config_to_move_into_thread = if let Some(config) = state_config.as_ref() {
-        config.clone()
-    } else {
-        let error = app::Error::Config(String::from("No config detected"));
-        return Err(Error::App(error));
-    };
-
     pool.execute(move |worker| {
         jobs.lock()
             .expect("Could not lock jobs")
@@ -208,7 +222,7 @@ pub fn terminate_background_backup(
     };
 
     let mut pool = state.pool.lock()?;
-    let result = pool.terminate_worker(*worker_id, || {
+    let result = pool.terminate_job(*worker_id, || {
         let file_path = format!("{}/.bmu_event_trigger", backup.client_folder.path);
 
         if let Err(e) = Command::new("touch").args([&file_path]).status() {
@@ -236,32 +250,91 @@ pub fn terminate_background_backup(
 }
 
 #[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn terminate_all_background_jobs(state: State<'_, app::MutexState>) -> Result<(), Error> {
+    let mut jobs = state.jobs.lock()?;
+    let mut pool = state.pool.lock()?;
+    jobs::backup::terminate_all(&mut jobs, &mut pool);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn reset(state: State<'_, app::MutexState>) -> Result<(), Error> {
     state.connection.lock().await.take();
-    let jobs = state.jobs.lock()?;
+    let mut jobs = state.jobs.lock()?;
     let mut pool = state.pool.lock()?;
 
-    jobs.iter().for_each(|(job_id, worker)| {
-        let client_folder_path = job_id.split('_').next().expect("Could not split job_id");
-
-        if let Err(why) = pool.terminate_worker(*worker, || {
-            let file_path = format!("{client_folder_path}/.bmu_event_trigger");
-
-            if let Err(e) = Command::new("touch").args([&file_path]).status() {
-                println!("Error: {e:?}");
-            }
-
-            if let Err(e) = Command::new("rm").args([&file_path]).status() {
-                println!("Error: {e:?}");
-            }
-        }) {
-            println!("Error terminating worker: {why}");
-        };
-    });
+    jobs::backup::terminate_all(&mut jobs, &mut pool);
 
     state.config.lock()?.take();
-    state.jobs.lock()?.clear();
-    drop(state.pool.lock()?);
+    drop(pool);
+
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn start_background_backups(
+    state: State<'_, app::MutexState>,
+    backups: Vec<Backup>,
+) -> Result<(), Error> {
+    let state_config = &state.config.lock()?;
+
+    if let Some(config) = state_config.as_ref() {
+        if !config.allow_background_backup {
+            return Err(Error::App(app::Error::Config(String::from(
+                "Background backup is disabled",
+            ))));
+        }
+    }
+
+    let jobs = state.jobs.lock()?;
+    let available_workers = state.pool.lock()?.available_workers();
+    let backup_jobs_that_are_not_already_running: Vec<_> = backups
+        .iter()
+        .filter(|b| {
+            !jobs
+                .iter()
+                .any(|(job_id, _)| job_id == &jobs::id_from_backup(b))
+        })
+        .collect();
+
+    let num_of_backups_to_start = backup_jobs_that_are_not_already_running.len();
+
+    if num_of_backups_to_start > available_workers {
+        state
+            .pool
+            .lock()?
+            .create_workers(num_of_backups_to_start - available_workers);
+    }
+
+    if num_of_backups_to_start == 0 {
+        return Ok(());
+    }
+
+    state.pool.lock()?.start_all_stopped_workers();
+
+    for value in backup_jobs_that_are_not_already_running {
+        let config_to_move_into_thread = if let Some(config) = state_config.as_ref() {
+            config.clone()
+        } else {
+            let error = app::Error::Config(String::from("No config detected"));
+            return Err(Error::App(error));
+        };
+
+        let backup = value.clone();
+
+        let job_id = jobs::id_from_backup(&backup);
+        let jobs = Arc::clone(&state.jobs);
+
+        let mut pool = state.pool.lock()?;
+        pool.execute(move |worker| {
+            jobs.lock()
+                .expect("Could not lock jobs")
+                .insert(job_id, worker.id);
+            jobs::backup::directory_on_change(&worker, &backup, config_to_move_into_thread);
+        })?;
+    }
 
     Ok(())
 }

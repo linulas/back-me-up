@@ -36,6 +36,7 @@ pub struct Config {
     pub username: String,
     pub server_address: String,
     pub server_port: u16,
+    pub allow_background_backup: bool,
 }
 
 pub struct MutexState {

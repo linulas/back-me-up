@@ -1,12 +1,15 @@
-use super::{Arguments, ThreadAction};
+use super::{Arguments, Pool, ThreadAction};
 use crate::models::app::{self, Config};
 use crate::models::backup::Backup;
 use crate::models::folder::Folder;
 use crate::ssh;
 use chrono::{DateTime, Local};
 use notify::{self, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use std::collections::HashMap;
 use std::io;
 use std::path::Path;
+use std::process::Command;
+use std::sync::MutexGuard;
 
 pub struct WatchDirectory {
     backup: Backup,
@@ -14,7 +17,7 @@ pub struct WatchDirectory {
 }
 
 pub fn directory_on_change(worker: &Arguments, backup: &Backup, config: Config) {
-    let thread_receiver = worker.receiver.lock().expect("Must have a thread receiver");
+    let worker_receiver = worker.receiver.lock().expect("Must have a thread receiver");
     let path = Path::new(&backup.client_folder.path);
     let (sender, receiver) = std::sync::mpsc::channel();
     let mut watcher = RecommendedWatcher::new(sender, notify::Config::default())
@@ -37,7 +40,7 @@ pub fn directory_on_change(worker: &Arguments, backup: &Backup, config: Config) 
     println!("watching {}", &backup.client_folder.path);
 
     loop {
-        let response = thread_receiver.recv();
+        let response = worker_receiver.recv();
         let thread_message = match response {
             Ok(message) => message,
             Err(e) => {
@@ -237,4 +240,28 @@ fn handle_notify_event(
     }
 
     Ok(())
+}
+
+#[allow(clippy::needless_pass_by_value)]
+pub fn terminate_all(jobs: &mut MutexGuard<HashMap<String, usize>>, pool: &mut MutexGuard<Pool>) {
+    jobs.iter_mut().for_each(|(job_id, worker)| {
+        println!("Terminating job: {job_id}");
+        let client_folder_path = job_id.split('_').next().expect("Could not split job_id");
+
+        if let Err(why) = pool.terminate_job(*worker, || {
+            let file_path = format!("{client_folder_path}/.bmu_event_trigger");
+
+            if let Err(e) = Command::new("touch").args([&file_path]).status() {
+                println!("Error: {e:?}");
+            }
+
+            if let Err(e) = Command::new("rm").args([&file_path]).status() {
+                println!("Error: {e:?}");
+            }
+        }) {
+            println!("Error terminating job: {why}");
+        };
+    });
+
+    jobs.clear();
 }

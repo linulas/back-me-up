@@ -6,6 +6,7 @@ use tauri::SystemTray;
 use tauri::{CustomMenuItem, SystemTrayMenu, SystemTrayMenuItem};
 
 mod commands;
+mod event;
 mod jobs;
 mod models;
 mod ssh;
@@ -36,9 +37,12 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::list_home_folders,
             commands::set_state,
+            commands::set_config,
             commands::backup_directory,
+            commands::start_background_backups,
             commands::backup_on_change,
             commands::terminate_background_backup,
+            commands::terminate_all_background_jobs,
             commands::drop_pool,
             commands::reset,
         ])
@@ -46,9 +50,5 @@ fn main() {
         .on_system_tray_event(tray::handle_system_tray_event)
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_, event| {
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
-            }
-        });
+        .run(event::handle_tauri_run);
 }

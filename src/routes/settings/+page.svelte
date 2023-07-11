@@ -1,27 +1,67 @@
 <script lang="ts">
 	import { BACKUPS_FILE_NAME, SERVER_CONFIG_FILE_NAME } from '$lib/app_files';
 	import Button from '$lib/button.svelte';
-	import { serverConfig } from '$lib/store';
-	import { BaseDirectory, readTextFile, removeFile, writeTextFile } from '@tauri-apps/api/fs';
+	import { backups, serverConfig } from '$lib/store';
+	import { BaseDirectory, removeFile, writeTextFile } from '@tauri-apps/api/fs';
 	import { invoke } from '@tauri-apps/api/tauri';
 	import { WebviewWindow, appWindow } from '@tauri-apps/api/window';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
+	import { emit, listen } from '@tauri-apps/api/event';
+	import { loadStoredBackupsAndSetToState, loadStoredConfigAndSetToState } from '../init';
+
 	import type { Config } from '../../../src-tauri/bindings/Config';
-	import { emit } from '@tauri-apps/api/event';
+	import type { Backup } from '../../../src-tauri/bindings/Backup';
 
-	// let allowBackgroundBackups = true;
 	let error: App.Error | undefined = undefined;
-	let resetSucceded = false;
+	let disconnected = false;
+	let loading = false;
 
-	$: if (resetSucceded) {
+	$: if (disconnected) {
 		appWindow.close();
 	}
 
-	$: console.log($serverConfig);
+	$: if ($serverConfig) {
+		emit('server-config-updated', $serverConfig).catch((e) => console.error(e));
+	}
 
-	// const toggleBackgroundBackups = () => {
-	// 	allowBackgroundBackups = !allowBackgroundBackups;
-	// };
+	const unlistenBackupsUpdate = listen<Backup[]>('backups-updated', ({ payload }) => {
+		payload && backups.update(() => payload);
+	});
+
+	const handleConfigUpdate = async (config: Config) => {
+		loading = true;
+
+		try {
+			await invoke('set_config', { config });
+
+			if (!config.allow_background_backup) {
+				await invoke('terminate_all_background_jobs');
+			}
+		} catch (e) {
+			console.error(e);
+			error = { message: "Couldn't update server state with new config" };
+		}
+
+		try {
+			await writeTextFile(SERVER_CONFIG_FILE_NAME, JSON.stringify(config), {
+				dir: BaseDirectory.AppConfig
+			});
+		} catch (e) {
+			console.error(e);
+			error = { message: "Couldn't save server config" };
+		}
+
+		loading = false;
+	};
+
+	const toggleBackgroundBackups = async () => {
+		serverConfig.update((state) => {
+			if (!state) return state;
+			state.allow_background_backup = !state?.allow_background_backup;
+			handleConfigUpdate(state);
+			return state;
+		});
+	};
 
 	const reset = async () => {
 		// HACK: Must type confirm as any because typescript doesn't type it as a promise
@@ -52,20 +92,24 @@
 
 		error = undefined;
 		serverConfig.set(undefined);
-		await emit('reload');
+		await emit('reset');
 		const mainWindow = WebviewWindow.getByLabel('main');
 		await mainWindow?.show();
-		resetSucceded = true;
+		disconnected = true;
 	};
 
 	onMount(async () => {
-		const stored_config: Config = JSON.parse(
-			await readTextFile(SERVER_CONFIG_FILE_NAME, {
-				dir: BaseDirectory.AppConfig
-			})
-		);
+		try {
+			loadStoredConfigAndSetToState();
+			loadStoredBackupsAndSetToState();
+		} catch (e) {
+			console.error(e);
+			error = { message: "Couldn't read config files" };
+		}
+	});
 
-		serverConfig.set(stored_config);
+	onDestroy(async () => {
+		(await unlistenBackupsUpdate)();
 	});
 </script>
 
@@ -79,17 +123,18 @@
 		<div class="error">{error.message}</div>
 	{/if}
 
-	<!-- <div class="options"> -->
-	<!-- 	<div class="option checkbox"> -->
-	<!-- 		<input -->
-	<!-- 			id="allow-background-backups" -->
-	<!-- 			type="checkbox" -->
-	<!-- 			checked={allowBackgroundBackups} -->
-	<!-- 			on:change={toggleBackgroundBackups} -->
-	<!-- 		/> -->
-	<!-- 		<label for="allow-background-backups">Allow background backups</label> -->
-	<!-- 	</div> -->
-	<!-- </div> -->
+	<div class="options">
+		<div class="option checkbox">
+			<input
+				disabled={loading}
+				id="allow-background-backups"
+				type="checkbox"
+				checked={$serverConfig?.allow_background_backup}
+				on:change={toggleBackgroundBackups}
+			/>
+			<label for="allow-background-backups">Allow background backups</label>
+		</div>
+	</div>
 </div>
 
 <style lang="scss">

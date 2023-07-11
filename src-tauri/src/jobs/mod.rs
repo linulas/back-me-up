@@ -6,6 +6,8 @@ use std::sync::mpsc::{self, Receiver, SendError, Sender};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
 
+const IS_AVAILABLE_SHOULD_LOCK: &str = "could not lock field 'is_available'";
+
 pub mod backup;
 
 pub type Id = String;
@@ -66,6 +68,7 @@ impl<F: FnOnce(Arguments)> FnBox for F {
     }
 }
 
+#[derive(Clone)]
 pub struct Arguments {
     pub id: WorkerId,
     pub sender: Arc<Mutex<Sender<ThreadAction>>>,
@@ -87,8 +90,13 @@ impl Pool {
             }
         }
 
-        Self { workers, sender, receiver }
+        Self {
+            workers,
+            sender,
+            receiver,
+        }
     }
+
     pub fn execute<F>(&mut self, f: F) -> Result<(), Error>
     where
         F: FnOnce(Arguments) + Send + 'static,
@@ -96,19 +104,34 @@ impl Pool {
         let job = Box::new(f);
 
         if !self.has_available_worker() {
-           self.add_worker(); 
+            self.create_workers(1);
         }
 
         Ok(self.sender.send(Message::New(job))?)
     }
 
-    fn has_available_worker(&self) -> bool {
+    pub fn available_workers(&self) -> usize {
+        self.workers.iter().fold(0, |acc, w| {
+            if *w.is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK) {
+                acc + 1
+            } else {
+                acc
+            }
+        })
+    }
+
+    fn has_available_worker(&mut self) -> bool {
         if self.workers.is_empty() {
             return false;
         };
 
-        for worker in &self.workers {
-            if worker.thread.is_none() {
+        for worker in &mut self.workers {
+            if *worker.is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK) {
+                if worker.thread.is_none() {
+                    *worker.is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK) = false;
+                    worker.start();
+                }
+
                 return true;
             }
         }
@@ -116,62 +139,30 @@ impl Pool {
         false
     }
 
-    fn add_worker(&mut self) {
-        let id = self.workers.len() + 1;
-        println!("Adding new worker width id {id}");
-
-        self.workers.push(Worker::new(id, Arc::clone(&self.receiver)));
-    }
-
-    pub fn terminate_worker(
-        &mut self,
-        id: WorkerId,
-        event_trigger: impl Fn(),
-    ) -> Result<(), String> {
-        let worker = match self.workers.iter_mut().find(|w| w.id == id) {
-            Some(worker) => worker,
-            None => return Err("Could not find worker".to_string()),
-        };
-
-        match worker.sender.lock() {
-            Ok(sender) => {
-                if let Err(error) = sender.send(ThreadAction::Terminate) {
-                    return Err(error.to_string());
-                }
-            }
-            Err(e) => return Err(format!("Could not send terminate message: \n{e:?}")),
+    pub fn create_workers(&mut self, size: usize) {
+        if size == 0 {
+            println!("size must be greater than 0");
+            return;
         }
 
-        let thread = if let Some(thread) = worker.thread.take() {
-            thread
-        } else {
-            println!("Worker {} already terminated.", worker.id);
-            return Ok(());
-        };
+        for _ in 0..size {
+            let id = self.workers.len() + 1;
+            let mut worker = Worker::new(id, Arc::clone(&self.receiver));
+            worker.start();
+            println!("Adding new worker width id {id}");
+            self.workers.push(worker);
+        }
+    }
 
-        // INFO: trigger event on the running job so that it can be closed
-        event_trigger();
-
-        println!(
-            "Shutting down worker {} (isFinised: {})",
-            worker.id,
-            thread.is_finished()
-        );
-        match thread.join() {
-            Ok(_) => {
-                println!("Worker {} terminated.", worker.id);
-                Ok(())
-            }
-            Err(e) => {
-                println!("Error shutting down worker {}: {e:?}", worker.id);
-                Err("Error shutting down worker".to_string())
+    pub fn start_all_stopped_workers(&mut self) {
+        for worker in &mut self.workers {
+            if *worker.is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK) && worker.thread.is_none() {
+                worker.start();
             }
         }
     }
-}
 
-impl Drop for Pool {
-    fn drop(&mut self) {
+    pub fn stop_all_workers(&mut self) {
         println!("Sending terminate message to all workers.");
 
         for worker in &mut self.workers {
@@ -181,8 +172,6 @@ impl Drop for Pool {
         }
 
         for worker in &mut self.workers {
-            println!("Shutting down worker {}", worker.id);
-
             match worker.thread.take() {
                 Some(thread) => match thread.join() {
                     Ok(_) => {
@@ -198,32 +187,82 @@ impl Drop for Pool {
             }
         }
     }
+
+    pub fn terminate_job(&mut self, id: WorkerId, event_trigger: impl Fn()) -> Result<(), String> {
+        let worker = match self.workers.iter_mut().find(|w| w.id == id) {
+            Some(worker) => worker,
+            None => return Err("Could not find worker".to_string()),
+        };
+
+        match worker.local_sender.lock() {
+            Ok(sender) => {
+                if let Err(error) = sender.send(ThreadAction::Terminate) {
+                    return Err(error.to_string());
+                }
+            }
+            Err(e) => return Err(format!("Could not send terminate message: \n{e:?}")),
+        }
+
+        // INFO: trigger event on the running job so that it can be closed
+        event_trigger();
+
+        Ok(())
+    }
+}
+
+impl Drop for Pool {
+    fn drop(&mut self) {
+        self.stop_all_workers();
+    }
 }
 
 pub struct Worker {
     pub id: WorkerId,
+    is_available: Arc<Mutex<bool>>,
     pub thread: Option<thread::JoinHandle<()>>,
-    sender: Arc<Mutex<Sender<ThreadAction>>>,
+    local_sender: Arc<Mutex<Sender<ThreadAction>>>,
+    local_receiver: Arc<Mutex<Receiver<ThreadAction>>>,
+    receiver: Arc<Mutex<mpsc::Receiver<Message>>>,
 }
 
 impl Worker {
     pub fn new(id: WorkerId, receiver: Arc<Mutex<mpsc::Receiver<Message>>>) -> Self {
-        let (sender, worker_receiver): Channel = mpsc::channel();
-        let worker_receiver = Arc::new(Mutex::new(worker_receiver));
-        let sender = Arc::new(Mutex::new(sender));
-        let receiver_for_thread = Arc::clone(&worker_receiver);
-        let sender_for_thread = Arc::clone(&sender);
-        let arguments = Arguments {
-            id,
-            sender: sender_for_thread,
-            receiver: receiver_for_thread,
-        };
+        let (local_sender, local_receiver): Channel = mpsc::channel();
+        let local_sender = Arc::new(Mutex::new(local_sender));
+        let local_receiver = Arc::new(Mutex::new(local_receiver));
+        let is_available = Arc::new(Mutex::new(true));
 
-        sender
+        Self {
+            id,
+            is_available,
+            thread: None,
+            local_sender,
+            local_receiver,
+            receiver,
+        }
+    }
+
+    pub fn start(&mut self) {
+        println!("Starting worker {}", self.id);
+        let local_sender = Arc::clone(&self.local_sender);
+        let local_receiver = Arc::clone(&self.local_receiver);
+
+        let arguments = Arguments {
+            id: self.id,
+            receiver: local_receiver,
+            sender: local_sender,
+        };
+        let is_available = Arc::clone(&self.is_available);
+
+        arguments
+            .sender
             .lock()
             .expect("could not lock sender")
             .send(ThreadAction::Start)
             .expect("could not send start message");
+
+        let id = self.id;
+        let receiver = Arc::clone(&self.receiver);
 
         let thread = thread::spawn(move || loop {
             let message = receiver
@@ -234,25 +273,24 @@ impl Worker {
 
             match message {
                 Message::New(job) => {
+                    *is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK) = false;
                     println!("Worker {id} got a job; executing.");
 
-                    job.call_box(arguments);
+                    job.call_box(arguments.clone());
                     println!("Worker {id} finished.");
-                    break;
+                    *is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK) = true;
                 }
                 Message::Terminate(termination_id) => {
                     if termination_id == id {
                         println!("Worker {id} was told to terminate.");
+                        *is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK) = true;
                         break;
                     }
                 }
             }
         });
-        Self {
-            id,
-            thread: Some(thread),
-            sender,
-        }
+
+        self.thread = Some(thread);
     }
 }
 

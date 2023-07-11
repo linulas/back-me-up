@@ -1,12 +1,7 @@
 <script lang="ts">
-	import { backups, clientConfig } from '$lib/store';
-	import { invoke } from '@tauri-apps/api/tauri';
+	import { clientConfig } from '$lib/store';
 	import { appWindow } from '@tauri-apps/api/window';
 	import { onMount } from 'svelte';
-
-	$: if ($backups.length > 0) {
-		$backups.map((backup) => invoke('backup_on_change', { backup }));
-	}
 
 	onMount(() => {
 		appWindow
@@ -19,7 +14,6 @@
 			});
 
 		appWindow.listen('tauri://theme-changed', ({ payload }: any) => {
-			console.log({ payload });
 			clientConfig.update(() => ({ theme: payload }));
 		});
 	});

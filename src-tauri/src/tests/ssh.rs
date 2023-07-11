@@ -9,6 +9,7 @@ async fn test_connection() {
         username: std::env::var("SSH_USER").expect("SSH_USER must be set"),
         server_address: std::env::var("SSH_HOST").expect("SSH_HOST must be set"),
         server_port: std::env::var("SSH_PORT").expect("SSH_PORT must be set").parse().expect("SSH_PORT must be a number"),
+        allow_background_backup: true,
     };
     let connection = connect::to_server(config).await;
     if let Err(e) = &connection {
@@ -26,6 +27,7 @@ async fn test_sftp_client() {
         username: std::env::var("SSH_USER").expect("SSH_USER must be set"),
         server_address: std::env::var("SSH_HOST").expect("SSH_HOST must be set"),
         server_port: std::env::var("SSH_PORT").expect("SSH_PORT must be set").parse().expect("SSH_PORT must be a number"),
+        allow_background_backup: true,
     };
     let client = connect::Connection::new(config)
         .await

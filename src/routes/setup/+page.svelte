@@ -40,7 +40,8 @@
 		const newConfig: Config = {
 			username,
 			server_address,
-			server_port
+			server_port,
+			allow_background_backup: true
 		};
 
 		// Test connection
@@ -57,7 +58,7 @@
 				};
 			});
 
-    if(error) return;
+		if (error) return;
 
 		try {
 			await writeTextFile(SERVER_CONFIG_FILE_NAME, JSON.stringify(newConfig), {
@@ -122,9 +123,9 @@
 		}
 	}
 
-  .light {
-    input {
-      background-color: $clr-foreground;
-    }
-  }
+	.light {
+		input {
+			background-color: $clr-foreground;
+		}
+	}
 </style>

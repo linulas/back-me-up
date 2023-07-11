@@ -14,10 +14,11 @@
 	import Button from '$lib/button.svelte';
 	import Select from '$lib/select.svelte';
 	import Modal from '$lib/modal.svelte';
-	import { listen } from '@tauri-apps/api/event';
+	import { emit, listen } from '@tauri-apps/api/event';
 
 	import type { Folder } from '../../src-tauri/bindings/Folder';
 	import type { Backup } from '../../src-tauri/bindings/Backup';
+	import type { Config } from '../../src-tauri/bindings/Config';
 
 	let server_home_folders: Folder[] = [];
 	let new_folder_to_backup: Folder | undefined;
@@ -38,6 +39,10 @@
 			error = { message: 'Failed to write backups file' };
 		});
 
+	$: if ($backups.length > 0 && $serverConfig?.allow_background_backup) {
+		$backups.map((backup) => invoke('backup_on_change', { backup }).catch((e) => console.error(e)));
+	}
+
 	$: Object.keys(button_states).map((key) => {
 		if (button_states[key] === 'success') {
 			setTimeout(() => {
@@ -46,11 +51,15 @@
 		}
 	});
 
-	const unlisten = listen<string>('reload', () => {
+	const unlistenReset = listen<string>('reset', () => {
 		backups.set([]);
 		clientConfig.set(clientDefaults);
 		serverConfig.set(undefined);
-		refresh();
+		loadConfig();
+	});
+
+	const unlistenRefreshServerConfig = listen<Config>('server-config-updated', ({ payload }) => {
+		payload && serverConfig.update(() => payload);
 	});
 
 	const backupDirectory = async (backup: Backup) => {
@@ -92,6 +101,7 @@
 		target_server_folder = undefined;
 
 		backups.update((currentState) => [...currentState, backup]);
+		emit('backups-updated', $backups);
 
 		if (!(await backupDirectory(backup))) {
 			new_folder_to_backup = JSON.parse(client_folder_copy);
@@ -108,8 +118,10 @@
 		if (!answer) return;
 
 		try {
-			await invoke('terminate_background_backup', { backup });
+			$serverConfig?.allow_background_backup &&
+				(await invoke('terminate_background_backup', { backup }));
 			backups.update((currentState) => currentState.filter((b) => b !== backup));
+			emit('backups-updated', $backups);
 
 			// Reactive data write won't run if length is 0, so we have to run manually in that case
 			if ($backups.length === 0) {
@@ -136,21 +148,20 @@
 		};
 	};
 
-	const refresh = async () => {
+	const loadConfig = async () => {
 		init()
 			.then((data) => {
 				server_home_folders = data;
 			})
 			.catch((err) => {
-				const redirect = isRedirect(err);
-				console.log({ redirect });
-				if (redirect) goto(err.location);
+				if (isRedirect(err)) goto(err.location);
 			});
 	};
 
-	onMount(refresh);
+	onMount(loadConfig);
 	onDestroy(async () => {
-		(await unlisten)();
+		(await unlistenReset)();
+		(await unlistenRefreshServerConfig)();
 	});
 </script>
 

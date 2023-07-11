@@ -36,7 +36,6 @@ const setStateOnServer = async (config: Config) => {
 const createConfigDirectory = async () => {
 	try {
 		const appConfigPath = await appConfigDir();
-		console.log(`Creating app config directory ${appConfigPath}`);
 		await createDir(appConfigPath);
 	} catch (e) {
 		console.error(e);
@@ -63,7 +62,7 @@ const configFileExist = async () => {
 	}
 };
 
-const setBackups = async () => {
+export const loadStoredBackupsAndSetToState = async () => {
 	const options = { dir: BaseDirectory.AppData };
 	try {
 		if (!(await exists(BACKUPS_FILE_NAME, options))) {
@@ -76,6 +75,13 @@ const setBackups = async () => {
 	}
 };
 
+export const loadStoredConfigAndSetToState = async () => {
+	const options = { dir: BaseDirectory.AppConfig };
+	const stored_config: Config = JSON.parse(await readTextFile(SERVER_CONFIG_FILE_NAME, options));
+	serverConfig.set(stored_config);
+	return stored_config;
+};
+
 export const init = async () => {
 	try {
 		if (!(await appConfigDirectoryExists())) {
@@ -83,15 +89,12 @@ export const init = async () => {
 		}
 
 		if (!(await configFileExist())) {
-			console.log('No config found, redirecting to setup...');
 			throw redirect(302, '/setup');
 		}
 
-		const options = { dir: BaseDirectory.AppConfig };
-		const stored_config: Config = JSON.parse(await readTextFile(SERVER_CONFIG_FILE_NAME, options));
-    setBackups();
-		serverConfig.set(stored_config); // Client app state
-		await setStateOnServer(stored_config);
+		loadStoredBackupsAndSetToState();
+		const config = await loadStoredConfigAndSetToState();
+		await setStateOnServer(config);
 		const server_home_folders = await getServerHomeFolders();
 
 		return server_home_folders;
