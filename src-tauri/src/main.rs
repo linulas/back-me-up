@@ -45,6 +45,7 @@ fn main() {
             commands::terminate_all_background_jobs,
             commands::drop_pool,
             commands::reset,
+            commands::get_client_name,
         ])
         .system_tray(app_tray)
         .on_system_tray_event(tray::handle_system_tray_event)

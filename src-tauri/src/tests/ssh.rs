@@ -6,6 +6,7 @@ use dotenv::dotenv;
 async fn test_connection() {
     dotenv().ok();
     let config = Config {
+        client_name: String::from("Test"),
         username: std::env::var("SSH_USER").expect("SSH_USER must be set"),
         server_address: std::env::var("SSH_HOST").expect("SSH_HOST must be set"),
         server_port: std::env::var("SSH_PORT").expect("SSH_PORT must be set").parse().expect("SSH_PORT must be a number"),
@@ -24,6 +25,7 @@ async fn test_connection() {
 async fn test_sftp_client() {
     dotenv().ok();
     let config = Config {
+        client_name: String::from("Test"),
         username: std::env::var("SSH_USER").expect("SSH_USER must be set"),
         server_address: std::env::var("SSH_HOST").expect("SSH_HOST must be set"),
         server_port: std::env::var("SSH_PORT").expect("SSH_PORT must be set").parse().expect("SSH_PORT must be a number"),

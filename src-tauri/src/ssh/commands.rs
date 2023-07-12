@@ -1,8 +1,22 @@
+use std::path::Path;
 use std::process::Command;
+
+use openssh_sftp_client::Sftp;
 
 use super::Error;
 use crate::models::app::Config;
 use crate::models::backup::Backup;
+
+pub async fn assert_client_directory_on_server(client: &Sftp, path: &Path) -> Result<(), Error> {
+    match client.open(&path).await {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            println!("Error: {e:?}");
+            client.fs().create_dir(&path).await?;
+            Ok(())
+        },
+    }
+}
 
 pub fn backup_to_server(backup: &Backup, config: &Config) -> Result<(), Error> {
     let connection_string = format!(

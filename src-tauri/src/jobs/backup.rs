@@ -124,8 +124,8 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
             server_folder: Folder {
                 name: file_name,
                 path: format!(
-                    "{}/{}{relative_path}",
-                    server_folder_path, job.backup.client_folder.name
+                    "{}/{}/{}{relative_path}",
+                    server_folder_path, job.config.client_name, job.backup.client_folder.name
                 ),
                 size: None,
             },
@@ -201,8 +201,10 @@ pub fn exec_backup_command(
         },
         server_folder: Folder {
             path: format!(
-                "{}/{}{relative_path}",
-                job.backup.server_folder.path, job.backup.client_folder.name
+                "{}/{}/{}{relative_path}",
+                job.backup.server_folder.path,
+                job.config.client_name,
+                job.backup.client_folder.name
             ),
             name: job.backup.server_folder.name.clone(),
             size: None,

@@ -40,7 +40,12 @@
 		});
 
 	$: if ($backups.length > 0 && $serverConfig?.allow_background_backup) {
-		$backups.map((backup) => invoke('backup_on_change', { backup }).catch((e) => console.error(e)));
+		$backups.map((backup) =>
+			invoke('backup_on_change', { backup }).catch((e) => {
+				console.error(e);
+				error = { message: `Failed to start background update for ${backup.client_folder.name}` };
+			})
+		);
 	}
 
 	$: Object.keys(button_states).map((key) => {
@@ -88,9 +93,6 @@
 			return;
 		}
 
-		const client_folder_copy = JSON.stringify(new_folder_to_backup);
-		const server_folder_copy = JSON.stringify(target_server_folder);
-
 		const backup: Backup = {
 			client_folder: new_folder_to_backup!,
 			server_folder,
@@ -104,8 +106,9 @@
 		emit('backups-updated', $backups);
 
 		if (!(await backupDirectory(backup))) {
-			new_folder_to_backup = JSON.parse(client_folder_copy);
-			target_server_folder = JSON.parse(server_folder_copy);
+      error = {
+        message: `Failed to backup ${backup.client_folder.name}`
+      }
 			return;
 		}
 	};

@@ -17,6 +17,7 @@ pub enum Error {
     App(app::Error),
     Ssh(ssh::Error),
     Job(jobs::Error),
+    Command(String),
 }
 
 impl From<ssh::Error> for Error {
@@ -58,6 +59,12 @@ impl From<jobs::Error> for Error {
 impl From<PoisonError<MutexGuard<'_, HashMap<String, usize>>>> for Error {
     fn from(e: PoisonError<MutexGuard<HashMap<String, usize>>>) -> Self {
         Self::App(app::Error::from(e))
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Self::Command(e.to_string())
     }
 }
 
@@ -145,17 +152,35 @@ pub fn set_config(config: Config, state: State<'_, app::MutexState>) -> Result<(
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-pub fn backup_directory(backup: Backup, state: State<'_, app::MutexState>) -> Result<(), Error> {
-    let config_mutex_guard = state.config.lock()?;
-    // let x = config_mutex_guard.get_or_insert_default();
-    let config = if let Some(config) = config_mutex_guard.as_ref() {
-        config
+pub async fn backup_directory(
+    mut backup: Backup,
+    state: State<'_, app::MutexState>,
+) -> Result<(), Error> {
+    let connection = state.connection.lock().await;
+
+    let client = match &connection.as_ref() {
+        Some(connection) => &connection.sftp_client,
+        None => {
+            let error = app::Error::MissingConnection(String::from("No connection"));
+            return Err(Error::App(error));
+        }
+    };
+
+    let config = if let Some(config) = state.config.lock()?.as_ref() {
+        config.clone()
     } else {
-        let error = app::Error::MissingConnection(String::from("No connection"));
+        let error = app::Error::Config(String::from("No config detected"));
         return Err(Error::App(error));
     };
 
-    Ok(ssh::commands::backup_to_server(&backup, config)?)
+    let folder_to_assert = format!("./{}/{}", backup.server_folder.name, config.client_name);
+
+    let path = Path::new(&folder_to_assert);
+    ssh::commands::assert_client_directory_on_server(client, path).await?;
+
+    backup.server_folder.path = format!("{}/{}", backup.server_folder.path, config.client_name);
+
+    Ok(ssh::commands::backup_to_server(&backup, &config)?)
 }
 
 #[tauri::command]
@@ -337,4 +362,13 @@ pub fn start_background_backups(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_client_name() -> Result<String, Error> {
+    let output = Command::new("uname")
+        .arg("-n") // -n flag to get the network node hostname
+        .output()?;
+
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }

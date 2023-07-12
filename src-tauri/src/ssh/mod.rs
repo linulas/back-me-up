@@ -22,6 +22,12 @@ impl From<openssh_sftp_client::Error> for Error {
     }
 }
 
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Self::Command(e.to_string())
+    }
+}
+
 impl Serialize for Error {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

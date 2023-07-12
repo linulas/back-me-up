@@ -4,14 +4,17 @@
 	import { goto } from '$app/navigation';
 	import { serverConfig, clientConfig } from '$lib/store';
 	import PlugIcon from '~icons/mdi/plug';
-
-	import type { Config } from '../../../src-tauri/bindings/Config';
 	import Button from '$lib/button.svelte';
 	import { SERVER_CONFIG_FILE_NAME } from '$lib/app_files';
 	import { invoke } from '@tauri-apps/api/tauri';
+	import { onMount } from 'svelte';
+  import { randomString } from '$lib/generate';
+
+	import type { Config } from '../../../src-tauri/bindings/Config';
 
 	let username = '';
 	let server_address = '';
+	let client_name = `unknown_client_${randomString(10)}`;
 	let server_port = 22;
 	let state: ButtonState = 'idle';
 	let error: App.Error | undefined;
@@ -38,6 +41,7 @@
 		state = 'loading';
 
 		const newConfig: Config = {
+			client_name,
 			username,
 			server_address,
 			server_port,
@@ -71,6 +75,15 @@
 			console.error(e);
 		}
 	};
+
+	onMount(async () => {
+		try {
+			client_name = await invoke('get_client_name');
+		} catch (e) {
+			error = { message: 'Could not get client name' };
+			console.error(e);
+		}
+	});
 </script>
 
 <div class={$clientConfig.theme}>

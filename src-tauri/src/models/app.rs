@@ -33,6 +33,7 @@ impl From<PoisonError<MutexGuard<'_, HashMap<String, usize>>>> for Error {
 #[derive(TS, Deserialize, Clone)]
 #[ts(export)]
 pub struct Config {
+    pub client_name: String,
     pub username: String,
     pub server_address: String,
     pub server_port: u16,
