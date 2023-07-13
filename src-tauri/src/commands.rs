@@ -155,7 +155,7 @@ pub fn set_config(config: Config, state: State<'_, app::MutexState>) -> Result<(
 pub async fn backup_directory(
     mut backup: Backup,
     state: State<'_, app::MutexState>,
-) -> Result<(), Error> {
+) -> Result<String, Error> {
     let connection = state.connection.lock().await;
 
     let client = match &connection.as_ref() {
@@ -178,9 +178,39 @@ pub async fn backup_directory(
     let path = Path::new(&folder_to_assert);
     ssh::commands::assert_client_directory_on_server(client, path).await?;
 
-    backup.server_folder.path = format!("{}/{}", backup.server_folder.path, config.client_name);
+    let mut pool = state.pool.lock()?;
+    let jobs = Arc::clone(&state.jobs);
+    let failed_jobs = Arc::clone(&state.failed_jobs);
 
-    Ok(ssh::commands::backup_to_server(&backup, &config)?)
+    // prepend client_name as a root folder on the server for the backup
+    backup.server_folder.path = format!("{}/{}", backup.server_folder.path, config.client_name);
+    let job_id_for_client = jobs::id_from_backup(&backup, &jobs::Kind::BackupDirectoryOnce);
+    if state.failed_jobs.lock()?.contains_key(&job_id_for_client) {
+        state.failed_jobs.lock()?.remove(&job_id_for_client);
+    }
+
+    pool.execute(move |worker| {
+        let job_id = jobs::id_from_backup(&backup, &jobs::Kind::BackupDirectoryOnce);
+        jobs.lock()
+            .expect("Could not lock jobs")
+            .insert(job_id.clone(), worker.id);
+
+        match ssh::commands::backup_to_server(&backup, &config) {
+            Ok(_) => {
+                jobs.lock().expect("Could not lock jobs").remove(&job_id);
+            }
+            Err(e) => {
+                println!("{e:?}");
+                jobs.lock().expect("Could not lock jobs").remove(&job_id);
+                failed_jobs
+                    .lock()
+                    .expect("Could not lock failed jobs")
+                    .insert(job_id, worker.id);
+            }
+        };
+    })?;
+
+    Ok(job_id_for_client)
 }
 
 #[tauri::command]
@@ -209,7 +239,7 @@ pub fn backup_on_change(state: State<'_, app::MutexState>, backup: Backup) -> Re
         ))));
     }
 
-    let job_id = jobs::id_from_backup(&backup);
+    let job_id = jobs::id_from_backup(&backup, &jobs::Kind::BackupDirectoryOnChange);
     let jobs = Arc::clone(&state.jobs);
 
     if jobs.lock()?.iter().any(|(id, _)| id == &job_id) {
@@ -238,7 +268,7 @@ pub fn terminate_background_backup(
     backup: Backup,
 ) -> Result<(), Error> {
     let mut jobs = state.jobs.lock()?;
-    let job_id = &jobs::id_from_backup(&backup);
+    let job_id = &jobs::id_from_backup(&backup, &jobs::Kind::BackupDirectoryOnChange);
     let worker_id = if let Some(id) = jobs.get(job_id) {
         id
     } else {
@@ -318,9 +348,9 @@ pub fn start_background_backups(
     let backup_jobs_that_are_not_already_running: Vec<_> = backups
         .iter()
         .filter(|b| {
-            !jobs
-                .iter()
-                .any(|(job_id, _)| job_id == &jobs::id_from_backup(b))
+            !jobs.iter().any(|(job_id, _)| {
+                job_id == &jobs::id_from_backup(b, &jobs::Kind::BackupDirectoryOnChange)
+            })
         })
         .collect();
 
@@ -349,7 +379,7 @@ pub fn start_background_backups(
 
         let backup = value.clone();
 
-        let job_id = jobs::id_from_backup(&backup);
+        let job_id = jobs::id_from_backup(&backup, &jobs::Kind::BackupDirectoryOnChange);
         let jobs = Arc::clone(&state.jobs);
 
         let mut pool = state.pool.lock()?;
@@ -366,9 +396,27 @@ pub fn start_background_backups(
 
 #[tauri::command]
 pub fn get_client_name() -> Result<String, Error> {
+    // TODO: use 'hostname' command for windows
     let output = Command::new("uname")
         .arg("-n") // -n flag to get the network node hostname
         .output()?;
 
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn check_job_status(
+    state: State<'_, app::MutexState>,
+    id: String,
+) -> Result<jobs::Status, Error> {
+    if state.failed_jobs.lock()?.contains_key(&id) {
+        println!("{id}: failed");
+        return Ok(jobs::Status::Failed);
+    } else if state.jobs.lock()?.contains_key(&id) {
+        return Ok(jobs::Status::Running);
+    }
+
+    println!("{id}: completed");
+    Ok(jobs::Status::Completed)
 }

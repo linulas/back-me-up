@@ -14,11 +14,13 @@
 	import Button from '$lib/button.svelte';
 	import Select from '$lib/select.svelte';
 	import Modal from '$lib/modal.svelte';
+	import { sleep } from '$lib/concurrency';
 	import { emit, listen } from '@tauri-apps/api/event';
 
 	import type { Folder } from '../../src-tauri/bindings/Folder';
 	import type { Backup } from '../../src-tauri/bindings/Backup';
 	import type { Config } from '../../src-tauri/bindings/Config';
+	import type { JobStatus } from '../../src-tauri/bindings/JobStatus';
 
 	let server_home_folders: Folder[] = [];
 	let new_folder_to_backup: Folder | undefined;
@@ -71,8 +73,19 @@
 		const buttonStateKey = `${backup.client_folder.name}_${backup.server_folder.name}`;
 		button_states[buttonStateKey] = 'loading';
 		try {
-			await invoke('backup_directory', { backup });
-			button_states[buttonStateKey] = 'success';
+			let jobId = await invoke<string>('backup_directory', { backup });
+			let status = await invoke<JobStatus>('check_job_status', { id: jobId });
+
+			while (status === 'Running') {
+				await sleep(1500);
+				status = await invoke<JobStatus>('check_job_status', { id: jobId });
+			}
+
+			if (status === 'Completed') {
+				button_states[buttonStateKey] = 'success';
+			} else {
+				button_states[buttonStateKey] = 'error';
+			}
 			return true;
 		} catch (e) {
 			console.error(e);
@@ -106,9 +119,9 @@
 		emit('backups-updated', $backups);
 
 		if (!(await backupDirectory(backup))) {
-      error = {
-        message: `Failed to backup ${backup.client_folder.name}`
-      }
+			error = {
+				message: `Failed to backup ${backup.client_folder.name}`
+			};
 			return;
 		}
 	};

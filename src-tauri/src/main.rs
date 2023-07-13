@@ -32,6 +32,7 @@ fn main() {
             config: Mutex::default(),
             connection: tokio::sync::Mutex::default(),
             jobs: Arc::new(Mutex::default()),
+            failed_jobs: Arc::new(Mutex::default()),
             pool: Mutex::new(pool),
         })
         .invoke_handler(tauri::generate_handler![
@@ -46,6 +47,7 @@ fn main() {
             commands::drop_pool,
             commands::reset,
             commands::get_client_name,
+            commands::check_job_status
         ])
         .system_tray(app_tray)
         .on_system_tray_event(tray::handle_system_tray_event)

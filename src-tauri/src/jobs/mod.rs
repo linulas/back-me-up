@@ -1,6 +1,7 @@
 use crate::models::app;
 use crate::models::backup::Backup;
 use serde::Serialize;
+use ts_rs::TS;
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, SendError, Sender};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -14,6 +15,7 @@ pub type Id = String;
 pub type WorkerId = usize;
 pub type Channel = (Sender<ThreadAction>, Receiver<ThreadAction>);
 pub type Active = HashMap<Id, WorkerId>;
+pub type Failed = HashMap<Id, WorkerId>;
 
 #[derive(Debug, Serialize)]
 pub enum Error {
@@ -39,6 +41,20 @@ impl<T> From<SendError<T>> for Error {
 pub struct Handle {
     pub id: Id,
     pub value: Option<thread::JoinHandle<()>>,
+}
+
+pub enum Kind {
+    BackupDirectoryOnChange,
+    BackupDirectoryOnce,
+}
+
+
+#[derive(TS, Serialize)]
+#[ts(export, export_to = "../../bindings/JobStatus.ts", rename = "JobStatus")]
+pub enum Status {
+    Running,
+    Failed,
+    Completed,
 }
 
 pub enum ThreadAction {
@@ -156,7 +172,9 @@ impl Pool {
 
     pub fn start_all_stopped_workers(&mut self) {
         for worker in &mut self.workers {
-            if *worker.is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK) && worker.thread.is_none() {
+            if *worker.is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK)
+                && worker.thread.is_none()
+            {
                 worker.start();
             }
         }
@@ -294,9 +312,19 @@ impl Worker {
     }
 }
 
-pub fn id_from_backup(backup: &Backup) -> String {
-    format!(
-        "{}_{}",
-        backup.client_folder.path, backup.server_folder.path
-    )
+pub fn id_from_backup(backup: &Backup, kind: &Kind) -> String {
+    match kind {
+        Kind::BackupDirectoryOnce => {
+            format!(
+                "{}_{}_backup_directory_once",
+                backup.client_folder.path, backup.server_folder.path
+            )
+        },
+        Kind::BackupDirectoryOnChange => {
+            format!(
+                "{}_{}_backup_directory_on_change",
+                backup.client_folder.path, backup.server_folder.path
+            )
+        }
+    }
 }

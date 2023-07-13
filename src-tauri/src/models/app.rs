@@ -44,5 +44,6 @@ pub struct MutexState {
     pub config: Mutex<Option<Config>>,
     pub connection: tokio::sync::Mutex<Option<Connection>>,
     pub jobs: Arc<Mutex<jobs::Active>>,
+    pub failed_jobs: Arc<Mutex<jobs::Failed>>,
     pub pool: Mutex<jobs::Pool>,
 }

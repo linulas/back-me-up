@@ -25,7 +25,7 @@ pub fn backup_to_server(backup: &Backup, config: &Config) -> Result<(), Error> {
     );
 
     let rsync = Command::new("rsync")
-        .arg("-av")
+        .arg("-a")
         .arg("-e")
         .arg(format!("ssh -p {}", config.server_port))
         .arg("--exclude=.*")
