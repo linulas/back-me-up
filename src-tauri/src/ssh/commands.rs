@@ -21,7 +21,7 @@ pub fn backup_to_server(backup: &Backup, config: &Config) -> Result<(), Error> {
         "{}@{}:'{}'",
         config.username,
         config.server_address.replace("http://", ""),
-        backup.server_folder.path
+        backup.server_location.path
     );
 
     let rsync = Command::new("rsync")
@@ -29,7 +29,7 @@ pub fn backup_to_server(backup: &Backup, config: &Config) -> Result<(), Error> {
         .arg("-e")
         .arg(format!("ssh -p {}", config.server_port))
         .arg("--exclude=.*")
-        .arg(&backup.client_folder.path)
+        .arg(&backup.client_location.path)
         .arg(&connection_string)
         .status()
         .expect("Failed to execute rsync command");
@@ -48,7 +48,7 @@ pub fn delete_from_server(backup: &Backup, config: &Config) -> Result<(), Error>
         config.server_address.replace("http://", ""),
     );
 
-    let delete_command_string = format!("rm -rf {}", backup.server_folder.path);
+    let delete_command_string = format!("rm -rf {}", backup.server_location.path);
 
     let ssh_delete = Command::new("ssh")
         .args([

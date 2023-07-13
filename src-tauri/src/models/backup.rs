@@ -1,12 +1,17 @@
 use serde::Deserialize;
 use ts_rs::TS;
 
-use super::folder::Folder;
+#[derive(TS, Deserialize, Clone)]
+#[ts(export)]
+pub struct Location {
+    pub entity_name: String,
+    pub path: String,
+}
 
 #[derive(TS, Deserialize, Clone)]
 #[ts(export)]
 pub struct Backup {
-    pub client_folder: Folder,
-    pub server_folder: Folder,
+    pub client_location: Location,
+    pub server_location: Location,
     pub latest_run: Option<u64>,
 }

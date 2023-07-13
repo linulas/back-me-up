@@ -317,13 +317,13 @@ pub fn id_from_backup(backup: &Backup, kind: &Kind) -> String {
         Kind::BackupDirectoryOnce => {
             format!(
                 "{}_{}_backup_directory_once",
-                backup.client_folder.path, backup.server_folder.path
+                backup.client_location.path, backup.server_location.path
             )
         },
         Kind::BackupDirectoryOnChange => {
             format!(
                 "{}_{}_backup_directory_on_change",
-                backup.client_folder.path, backup.server_folder.path
+                backup.client_location.path, backup.server_location.path
             )
         }
     }

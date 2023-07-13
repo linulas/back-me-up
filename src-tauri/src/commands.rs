@@ -1,7 +1,7 @@
 use crate::jobs::{self, Pool};
 use crate::models::app::{self, Config};
 use crate::models::backup::Backup;
-use crate::models::folder::{Folder, Size};
+use crate::models::storage::{Folder, Size};
 use crate::ssh::{self, connect::Connection};
 use futures::TryStreamExt;
 use openssh_sftp_client::fs::DirEntry;
@@ -173,7 +173,7 @@ pub async fn backup_directory(
         return Err(Error::App(error));
     };
 
-    let folder_to_assert = format!("./{}/{}", backup.server_folder.name, config.client_name);
+    let folder_to_assert = format!("./{}/{}", backup.server_location.entity_name, config.client_name);
 
     let path = Path::new(&folder_to_assert);
     ssh::commands::assert_client_directory_on_server(client, path).await?;
@@ -183,7 +183,7 @@ pub async fn backup_directory(
     let failed_jobs = Arc::clone(&state.failed_jobs);
 
     // prepend client_name as a root folder on the server for the backup
-    backup.server_folder.path = format!("{}/{}", backup.server_folder.path, config.client_name);
+    backup.server_location.path = format!("{}/{}", backup.server_location.path, config.client_name);
     let job_id_for_client = jobs::id_from_backup(&backup, &jobs::Kind::BackupDirectoryOnce);
     if state.failed_jobs.lock()?.contains_key(&job_id_for_client) {
         state.failed_jobs.lock()?.remove(&job_id_for_client);
@@ -245,7 +245,7 @@ pub fn backup_on_change(state: State<'_, app::MutexState>, backup: Backup) -> Re
     if jobs.lock()?.iter().any(|(id, _)| id == &job_id) {
         println!(
             "Already running background backup for {}",
-            backup.client_folder.path
+            backup.client_location.path
         );
         return Ok(());
     };
@@ -278,7 +278,7 @@ pub fn terminate_background_backup(
 
     let mut pool = state.pool.lock()?;
     let result = pool.terminate_job(*worker_id, || {
-        let file_path = format!("{}/.bmu_event_trigger", backup.client_folder.path);
+        let file_path = format!("{}/.bmu_event_trigger", backup.client_location.path);
 
         if let Err(e) = Command::new("touch").args([&file_path]).status() {
             println!("Error: {e:?}");

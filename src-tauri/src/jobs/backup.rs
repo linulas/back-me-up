@@ -1,7 +1,6 @@
 use super::{Arguments, Pool, ThreadAction};
 use crate::models::app::{self, Config};
-use crate::models::backup::Backup;
-use crate::models::folder::Folder;
+use crate::models::backup::{Backup, Location};
 use crate::ssh;
 use chrono::{DateTime, Local};
 use notify::{self, Event, RecommendedWatcher, RecursiveMode, Watcher};
@@ -18,11 +17,11 @@ pub struct WatchDirectory {
 
 pub fn directory_on_change(worker: &Arguments, backup: &Backup, config: Config) {
     let worker_receiver = worker.receiver.lock().expect("Must have a thread receiver");
-    let path = Path::new(&backup.client_folder.path);
+    let path = Path::new(&backup.client_location.path);
     let (sender, receiver) = std::sync::mpsc::channel();
     let mut watcher = RecommendedWatcher::new(sender, notify::Config::default())
         .expect("failed to create watcher");
-    let mut last_modified: DateTime<Local> = Path::new(&backup.client_folder.path)
+    let mut last_modified: DateTime<Local> = Path::new(&backup.client_location.path)
         .metadata()
         .expect("failed to get metadata")
         .modified()
@@ -37,7 +36,7 @@ pub fn directory_on_change(worker: &Arguments, backup: &Backup, config: Config) 
         .watch(path.as_ref(), RecursiveMode::Recursive)
         .expect("failed to watch directory");
 
-    println!("watching {}", &backup.client_folder.path);
+    println!("watching {}", &backup.client_location.path);
 
     loop {
         let response = worker_receiver.recv();
@@ -97,8 +96,8 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
 
     if let Some(path_buf) = event.paths.get(0) {
         let target_path = path_buf.to_str().unwrap_or("").replace(' ', r"\ ");
-        let server_folder_path = job.backup.server_folder.path.replace(' ', r"\ ");
-        let client_folder_path = job.backup.client_folder.path.replace(' ', r"\ ");
+        let server_folder_path = job.backup.server_location.path.replace(' ', r"\ ");
+        let client_folder_path = job.backup.client_location.path.replace(' ', r"\ ");
         // make sure to not delete root folder for the backup
         if target_path == server_folder_path {
             println!("Ignoring deletion of {target_path}");
@@ -116,23 +115,21 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
             .replace(' ', r"\ ");
 
         let backup_realtive_to_root = Backup {
-            client_folder: Folder {
-                name: file_name.clone(),
+            client_location: Location {
+                entity_name: file_name.clone(),
                 path: target_path,
-                size: None,
             },
-            server_folder: Folder {
-                name: file_name,
+            server_location: Location {
+                entity_name: file_name,
                 path: format!(
                     "{}/{}/{}{relative_path}",
-                    server_folder_path, job.config.client_name, job.backup.client_folder.name
+                    server_folder_path, job.config.client_name, job.backup.client_location.entity_name
                 ),
-                size: None,
             },
             latest_run: None,
         };
 
-        println!("Deleting {}", backup_realtive_to_root.server_folder.path);
+        println!("Deleting {}", backup_realtive_to_root.server_location.path);
         let result = ssh::commands::delete_from_server(&backup_realtive_to_root, &job.config);
 
         if let Err(e) = result {
@@ -180,7 +177,7 @@ pub fn exec_backup_command(
 
     let data = path.metadata()?;
     let entity_modified_date: DateTime<Local> = data.modified()?.into();
-    let root_path = Path::new(&job.backup.client_folder.path);
+    let root_path = Path::new(&job.backup.client_location.path);
     let new_modified_date: DateTime<Local> = root_path.metadata()?.modified()?.into();
 
     if new_modified_date.timestamp() <= latest_modified.timestamp() {
@@ -191,23 +188,21 @@ pub fn exec_backup_command(
     let relative_path = path
         .to_str()
         .unwrap_or_default()
-        .replace(&job.backup.client_folder.path, "");
+        .replace(&job.backup.client_location.path, "");
 
     let backup_realtive_to_root = Backup {
-        client_folder: Folder {
+        client_location: Location {
             path: path.to_str().unwrap_or_default().to_string(),
-            name: job.backup.client_folder.name.clone(),
-            size: None,
+            entity_name: job.backup.client_location.entity_name.clone(),
         },
-        server_folder: Folder {
+        server_location: Location {
             path: format!(
                 "{}/{}/{}{relative_path}",
-                job.backup.server_folder.path,
+                job.backup.server_location.path,
                 job.config.client_name,
-                job.backup.client_folder.name
+                job.backup.client_location.entity_name
             ),
-            name: job.backup.server_folder.name.clone(),
-            size: None,
+            entity_name: job.backup.server_location.entity_name.clone(),
         },
         latest_run: None,
     };

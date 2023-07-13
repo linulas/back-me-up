@@ -45,7 +45,7 @@
 		$backups.map((backup) =>
 			invoke('backup_on_change', { backup }).catch((e) => {
 				console.error(e);
-				error = { message: `Failed to start background update for ${backup.client_folder.name}` };
+				error = { message: `Failed to start background update for ${backup.client_location.entity_name}` };
 			})
 		);
 	}
@@ -70,7 +70,7 @@
 	});
 
 	const backupDirectory = async (backup: Backup) => {
-		const buttonStateKey = `${backup.client_folder.name}_${backup.server_folder.name}`;
+		const buttonStateKey = `${backup.client_location.entity_name}_${backup.server_location.entity_name}`;
 		button_states[buttonStateKey] = 'loading';
 		try {
 			let jobId = await invoke<string>('backup_directory', { backup });
@@ -107,8 +107,11 @@
 		}
 
 		const backup: Backup = {
-			client_folder: new_folder_to_backup!,
-			server_folder,
+			client_location: {
+				entity_name: new_folder_to_backup!.name,
+				path: new_folder_to_backup!.path
+			},
+			server_location: { entity_name: server_folder.name, path: server_folder.path },
 			latest_run: null
 		};
 
@@ -120,7 +123,7 @@
 
 		if (!(await backupDirectory(backup))) {
 			error = {
-				message: `Failed to backup ${backup.client_folder.name}`
+				message: `Failed to backup ${backup.client_location.entity_name}`
 			};
 			return;
 		}
@@ -129,7 +132,7 @@
 	const deleteBackup = async (backup: Backup) => {
 		// HACK: Must type confirm as any because typescript doesn't type it as a promise
 		const answer: Promise<boolean> = await (confirm as any)(
-			`Are you sure you want to stop backing up ${backup.client_folder.name}?\n\nYour data will still exists on the server, that has to be deleted seperately.`
+			`Are you sure you want to stop backing up ${backup.client_location.entity_name}?\n\nYour data will still exists on the server, that has to be deleted seperately.`
 		);
 		if (!answer) return;
 
@@ -214,7 +217,7 @@
 				</div>
 			</div>
 			{#each $backups as backup}
-				{@const backupKey = `${backup.client_folder.name}_${backup.server_folder.name}`}
+				{@const backupKey = `${backup.client_location.entity_name}_${backup.server_location.entity_name}`}
 				<div class="backup grid">
 					<div class="folder">
 						<div>
@@ -222,7 +225,7 @@
 								<TrashIcon color="#ef4444" />
 							</Button>
 							<span>
-								{backup.client_folder.name}
+								{backup.client_location.entity_name}
 							</span>
 						</div>
 					</div>
@@ -236,7 +239,7 @@
 						<ArrowIcon slot="icon" color="white" />
 					</Button>
 					<div class="folder">
-						<div>{backup.server_folder.name}</div>
+						<div>{backup.server_location.entity_name}</div>
 					</div>
 				</div>
 			{/each}

@@ -3,6 +3,13 @@ use std::fmt::Display;
 use serde::{Serialize, Deserialize};
 use ts_rs::TS;
 
+#[derive(TS, Deserialize, Clone)]
+#[ts(export)]
+pub enum Entity {
+    Folder(Folder),
+    File(File),
+}
+
 #[derive(TS, Debug, Serialize, Deserialize, Clone)]
 #[ts(export)]
 pub enum Size {
@@ -40,4 +47,13 @@ pub struct Folder {
     pub name: String,
     pub path: String,
     pub size: Option<Size>,
+}
+
+#[derive(TS, Debug, Serialize, Deserialize, Clone)]
+#[ts(export)]
+pub struct File {
+    pub name: String,
+    pub path: String,
+    pub size: Option<Size>,
+    pub mime_type: Option<String>,
 }
