@@ -152,7 +152,7 @@ pub fn set_config(config: Config, state: State<'_, app::MutexState>) -> Result<(
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-pub async fn backup_directory(
+pub async fn backup_entity(
     mut backup: Backup,
     state: State<'_, app::MutexState>,
 ) -> Result<String, Error> {
@@ -184,13 +184,13 @@ pub async fn backup_directory(
 
     // prepend client_name as a root folder on the server for the backup
     backup.server_location.path = format!("{}/{}", backup.server_location.path, config.client_name);
-    let job_id_for_client = jobs::id_from_backup(&backup, &jobs::Kind::BackupDirectoryOnce);
+    let job_id_for_client = jobs::id_from_backup(&backup, &jobs::Kind::Backup);
     if state.failed_jobs.lock()?.contains_key(&job_id_for_client) {
         state.failed_jobs.lock()?.remove(&job_id_for_client);
     }
 
     pool.execute(move |worker| {
-        let job_id = jobs::id_from_backup(&backup, &jobs::Kind::BackupDirectoryOnce);
+        let job_id = jobs::id_from_backup(&backup, &jobs::Kind::Backup);
         jobs.lock()
             .expect("Could not lock jobs")
             .insert(job_id.clone(), worker.id);
@@ -239,7 +239,7 @@ pub fn backup_on_change(state: State<'_, app::MutexState>, backup: Backup) -> Re
         ))));
     }
 
-    let job_id = jobs::id_from_backup(&backup, &jobs::Kind::BackupDirectoryOnChange);
+    let job_id = jobs::id_from_backup(&backup, &jobs::Kind::BackupOnChange);
     let jobs = Arc::clone(&state.jobs);
 
     if jobs.lock()?.iter().any(|(id, _)| id == &job_id) {
@@ -268,7 +268,7 @@ pub fn terminate_background_backup(
     backup: Backup,
 ) -> Result<(), Error> {
     let mut jobs = state.jobs.lock()?;
-    let job_id = &jobs::id_from_backup(&backup, &jobs::Kind::BackupDirectoryOnChange);
+    let job_id = &jobs::id_from_backup(&backup, &jobs::Kind::BackupOnChange);
     let worker_id = if let Some(id) = jobs.get(job_id) {
         id
     } else {
@@ -349,7 +349,7 @@ pub fn start_background_backups(
         .iter()
         .filter(|b| {
             !jobs.iter().any(|(job_id, _)| {
-                job_id == &jobs::id_from_backup(b, &jobs::Kind::BackupDirectoryOnChange)
+                job_id == &jobs::id_from_backup(b, &jobs::Kind::BackupOnChange)
             })
         })
         .collect();
@@ -379,7 +379,7 @@ pub fn start_background_backups(
 
         let backup = value.clone();
 
-        let job_id = jobs::id_from_backup(&backup, &jobs::Kind::BackupDirectoryOnChange);
+        let job_id = jobs::id_from_backup(&backup, &jobs::Kind::BackupOnChange);
         let jobs = Arc::clone(&state.jobs);
 
         let mut pool = state.pool.lock()?;

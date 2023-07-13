@@ -39,7 +39,7 @@ fn main() {
             commands::list_home_folders,
             commands::set_state,
             commands::set_config,
-            commands::backup_directory,
+            commands::backup_entity,
             commands::start_background_backups,
             commands::backup_on_change,
             commands::terminate_background_backup,

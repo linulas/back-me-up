@@ -44,8 +44,8 @@ pub struct Handle {
 }
 
 pub enum Kind {
-    BackupDirectoryOnChange,
-    BackupDirectoryOnce,
+    BackupOnChange,
+    Backup,
 }
 
 
@@ -314,15 +314,15 @@ impl Worker {
 
 pub fn id_from_backup(backup: &Backup, kind: &Kind) -> String {
     match kind {
-        Kind::BackupDirectoryOnce => {
+        Kind::Backup => {
             format!(
-                "{}_{}_backup_directory_once",
+                "{}_{}_backup",
                 backup.client_location.path, backup.server_location.path
             )
         },
-        Kind::BackupDirectoryOnChange => {
+        Kind::BackupOnChange => {
             format!(
-                "{}_{}_backup_directory_on_change",
+                "{}_{}_backup_on_change",
                 backup.client_location.path, backup.server_location.path
             )
         }
