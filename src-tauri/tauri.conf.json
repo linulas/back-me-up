@@ -8,7 +8,7 @@
 	},
 	"package": {
 		"productName": "Back me up",
-		"version": "0.1.0"
+		"version": "1.0.0"
 	},
 	"tauri": {
 		"allowlist": {
@@ -53,7 +53,7 @@
 				"icons/icon.icns",
 				"icons/icon.ico"
 			],
-			"identifier": "com.tauri.dev",
+			"identifier": "bmu",
 			"longDescription": "",
 			"macOS": {
 				"entitlements": null,
