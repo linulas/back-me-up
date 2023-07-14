@@ -45,7 +45,9 @@
 		$backups.map((backup) =>
 			invoke('backup_on_change', { backup }).catch((e) => {
 				console.error(e);
-				error = { message: `Failed to start background update for ${backup.client_location.entity_name}` };
+				error = {
+					message: `Failed to start background update for ${backup.client_location.entity_name}`
+				};
 			})
 		);
 	}
@@ -73,7 +75,7 @@
 		const buttonStateKey = `${backup.client_location.entity_name}_${backup.server_location.entity_name}`;
 		button_states[buttonStateKey] = 'loading';
 		try {
-			let jobId = await invoke<string>('backup_directory', { backup });
+			let jobId = await invoke<string>('backup_entity', { backup });
 			let status = await invoke<JobStatus>('check_job_status', { id: jobId });
 
 			while (status === 'Running') {
