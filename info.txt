@@ -1,3 +1,0 @@
-version="0.6.7"
-author="Linus_Brannstrom"
-patch_notes="This version (0.6.x) was dedicated to optimizing function usage

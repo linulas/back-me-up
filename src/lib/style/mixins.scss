@@ -1,0 +1,63 @@
+@mixin text-4xl {
+	font-size: 4.5rem;
+	line-height: 4.875rem;
+	letter-spacing: -0.04em;
+}
+
+@mixin text-3xl {
+	font-size: 3.25rem;
+	line-height: 3.625rem;
+	letter-spacing: -0.03em;
+}
+
+@mixin text-2xl {
+	font-size: 2.5rem;
+	line-height: 3rem;
+	letter-spacing: -0.03em;
+}
+
+@mixin text-xl {
+	font-size: 1.625rem;
+	line-height: 2rem;
+	letter-spacing: -0.02em;
+}
+
+@mixin text-lg {
+	font-size: 1.375rem;
+	line-height: 1.813rem;
+	letter-spacing: -0.01em;
+}
+
+@mixin text-md {
+	font-size: 1.125rem;
+	line-height: 1.625rem;
+}
+
+@mixin text-base {
+	font-size: 1rem;
+	line-height: 1.5rem;
+}
+
+@mixin text-sm {
+	font-size: 0.875rem;
+	line-height: 1.3125rem;
+}
+
+@mixin text-xs {
+	font-size: 0.75rem;
+	line-height: 1.125rem;
+}
+
+@mixin wordBreak {
+	@media screen and (max-width: 24rem) {
+		word-break: break-word;
+	}
+}
+
+@mixin box {
+	border-radius: 1rem;
+	-webkit-box-shadow: -1px 1px 4px 0px rgba(0, 0, 0, 0.5);
+	-moz-box-shadow: -1px 1px 4px 0px rgba(0, 0, 0, 0.5);
+	box-shadow: -1px 1px 4px 0px rgba(0, 0, 0, 0.5);
+}
+

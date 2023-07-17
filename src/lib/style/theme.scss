@@ -1,0 +1,54 @@
+@import './colors.scss';
+@import './mixins.scss';
+
+// Shared colors
+$clr-primary-action: $emerald-600;
+$clr-primary-action_hover: $emerald-500;
+$clr-danger: $red-500;
+$clr-warning: $amber-500;
+$clr-success: $emerald-500;
+
+// Ligth theme colors
+$clr-background: $neutral-50;
+$clr-foreground: $slate-200;
+$clr-border: $neutral-200;
+$clr-text_light: white;
+$clr-secondary-action: $slate-900;
+$clr-secondary-action_hover: $slate-800;
+
+// Dark theme colors
+$clr-background_dark: $slate-900;
+$clr-border_dark: $slate-800;
+$clr-foreground_dark: $slate-700;
+$clr-text_dark: $neutral-900;
+$clr-secondary-action_dark: $slate-700;
+$clr-secondary-action_hover_dark: $slate-600;
+
+// Fonts
+$font-sans-serif: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif,
+	'Apple Color Emoji', 'Segoe UI Emoji';
+$font-sans: Iowan Old Style, Apple Garamond, Baskerville, Times New Roman, Droid Serif, Times,
+	Source Serif Pro, serif, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol;
+$font-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+
+// Heding margins
+$m-4xl: 3.5rem 0 1.75rem;
+$m-3xl: 3rem 0 1.5rem;
+$m-2xl: 2.5rem 0 1.25rem;
+$m-xl: 2rem 0 1rem;
+$m-lg: 1.75rem 0 0.875rem;
+$m-md: 1.5rem 0 0.725rem;
+$m-base: 1.25rem 0 0.625rem;
+$m-sm: 1rem 0 0.5rem;
+$m-xs: 0.75rem 0 0.375rem;
+
+// Breakpoints
+$media-sm: 40rem; // 640px
+$media-md: 48rem; // 768px
+$media-lg: 64rem; // 1024px
+$media-xl: 80rem; // 1280px
+$media-2xl: 96rem; // 1536px
+$media-3xl: 105rem; // 1680px
+
+// Dimensions
+$page-width: 75rem;

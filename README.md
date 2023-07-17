@@ -1,60 +1,15 @@
 # Back Me Up
-This scipt is used to perform backups of files or folders from the subdirectories of a specific user
+A simple tauri app that uses openssh to back up files to a remote server. This is a hobby project of mine and I'm always looking for new ways to improve it, so feel free to fork and contribute.
 
-## Setup
-To start using, clone or download the files and go to the folder in a command line, give it permissions and run the script to start the setup:
+![Example Image](./.github/samples/app_overview.png)
 
-### Unix (Mac OS & Linux)
-````
-cd insert_path_to_backup.sh_here
-````
+## 🛠️ Requirements
 
-````
-sudo chmod 777
-````
+- Passwordless SSH key setup between client (where you will install the app) and the target backup server.
+- rsync command installed on both client and server.
 
-````
-sudo ./backup.sh
-````
+## 💻 Installation
+Back me up is currently only available on unix platforms. Grab the [latest version from github](https://github.com/linulas/back-me-up/releases).
 
-### Windows
-To use with Windows, bash needs to be enabled by following [this tutorial](https://www.windowscentral.com/how-install-bash-shell-command-line-windows-10), or alternativley, downlad and install [git bash cmd](https://git-scm.com/downloads).
-
-Start the windows or bash cmd as administrator and navigate to the folder where the script and other files are and launch the setup with:
-````
-sh ./backup.sh
-````
-
-## Usage
-Backup default folder specified in the setup:
-````
-backup
-````
-Backup another folder to the default output location (path starts at home directory of the current user):
-````
-backup path_to_folder
-````
-
-### Flags
-
--u&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; --User - Specifies another user than the current one
-
--f&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; --File - Specify a file instead of a directory
-
--b&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; --Backup - Specify an alternate bakcup output location
-
-### Examples
-
-Backup a single file to defautl location:
-````
-backup -f path_to_file
-````
-Backup file from another user to a specific location
-````
-backup -u 'John Snow' -f path_to_file -b path_to_location
-````
-
-## Contact
-If you have any questions, bugs to report, or suggestuions on how to improve the script, please let me know. Or fork the script and improve it yourself and feel free to add yourself as author.
-
-contact@linusbrannstrom.dev
+## ⚠️  Disclaimer
+This is a work in progress and should not be viewed as a finished product. There may be bugs, missing features, and other issues. If you encounter any, please let me know. Submit your [issues to github](https://github.com/linulas/back-me-up/issues).
