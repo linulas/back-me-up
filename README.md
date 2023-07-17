@@ -13,3 +13,6 @@ Back me up is currently only available on unix platforms. Grab the [latest versi
 
 ## ⚠️  Disclaimer
 This is a work in progress and should not be viewed as a finished product. There may be bugs, missing features, and other issues. If you encounter any, please let me know. Submit your [issues to github](https://github.com/linulas/back-me-up/issues).
+
+## Test
+just a quick test to trigger github action.
