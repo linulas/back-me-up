@@ -18,7 +18,7 @@ const getServerHomeFolders = async () => {
 		return await invoke<Folder[]>('list_home_folders');
 	} catch (e) {
 		const appError: App.Error = { message: "Couldn't get server home folders" };
-		logError(`Client log: ${appError.message}: ${JSON.stringify(e)}`);
+		logError(`${appError.message}: ${JSON.stringify(e)}`);
 		throw error(500, appError);
 	}
 };
@@ -30,7 +30,7 @@ const setStateOnServer = async (config: Config) => {
 		const appError: App.Error = {
 			message: "Couldn't establish a server connection based on your config"
 		};
-		logError(`Client log: ${appError.message}: ${JSON.stringify(e)}`);
+		logError(`${appError.message}: ${JSON.stringify(e)}`);
 		throw error(500, appError);
 	}
 };
@@ -41,7 +41,7 @@ const createConfigDirectory = async () => {
 		await createDir(appConfigPath);
 	} catch (e) {
 		const message = `Couldn't create config directory`;
-		logError(`Client log: ${message}: ${JSON.stringify(e)}`);
+		logError(`${message}: ${JSON.stringify(e)}`);
 		throw error(500, { message });
 	}
 };
@@ -61,7 +61,7 @@ const configFileExist = async () => {
 		return await exists(SERVER_CONFIG_FILE_NAME, options);
 	} catch (e) {
 		const message = `Error checking if config file exists`;
-		logError(`Client log: ${message}: ${JSON.stringify(e)}`);
+		logError(`${message}: ${JSON.stringify(e)}`);
 		throw error(500, { message });
 	}
 };
@@ -108,7 +108,7 @@ export const init = async () => {
 			await goto(e.location);
 		} else {
 			const message = "Couldn't load config";
-			logError(`Client log: ${message}: ${JSON.stringify(e)}`);
+			logError(`${message}: ${JSON.stringify(e)}`);
 			throw error(500, { message });
 		}
 	}

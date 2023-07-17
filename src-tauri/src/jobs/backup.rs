@@ -124,7 +124,9 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
                 entity_name: file_name,
                 path: format!(
                     "{}/{}/{}{relative_path}",
-                    server_folder_path, job.config.client_name, job.backup.client_location.entity_name
+                    server_folder_path,
+                    job.config.client_name,
+                    job.backup.client_location.entity_name
                 ),
             },
             latest_run: None,
@@ -248,12 +250,32 @@ pub fn terminate_all(jobs: &mut MutexGuard<HashMap<String, usize>>, pool: &mut M
         if let Err(why) = pool.terminate_job(*worker, || {
             let file_path = format!("{client_folder_path}/.bmu_event_trigger");
 
-            if let Err(e) = Command::new("touch").args([&file_path]).status() {
-                error!("Could not execute touch command: {e:?}");
+            match Command::new("touch").args([&file_path]).output() {
+                Ok(output) => {
+                    if !output.status.success() {
+                        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                        let why = format!("Failed to create file: {stdout}\n{stderr}");
+                        error!("{why}");
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to create file: {e:?}");
+                }
             }
 
-            if let Err(e) = Command::new("rm").args([&file_path]).status() {
-                error!("Could not execute rm command: {e:?}");
+            match Command::new("rm").args([&file_path]).output() {
+                Ok(output) => {
+                    if !output.status.success() {
+                        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                        let why = format!("Failed to remove file: {stdout}\n{stderr}");
+                        error!("{why}");
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to remove file: {e:?}");
+                }
             }
         }) {
             error!("Could not terminate job: {why}");

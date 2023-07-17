@@ -60,7 +60,7 @@
 				error = {
 					message: "Couldn't establish a server connection based on your config"
 				};
-				logError(`Client log: ${error.message}: ${JSON.stringify(e)}`);
+				logError(`${error.message}: ${JSON.stringify(e)}`);
 			});
 
 		if (error) return;
@@ -73,7 +73,7 @@
 		} catch (e) {
 			state = 'error';
 			error = { message: 'Could not write config file' };
-			logError(`Client log: ${error.message}: ${JSON.stringify(e)}`);
+			logError(`${error.message}: ${JSON.stringify(e)}`);
 		}
 	};
 
@@ -82,7 +82,7 @@
 			client_name = await invoke('get_client_name');
 		} catch (e) {
 			error = { message: 'Could not get client name' };
-			logError(`Client log: ${error.message}: ${JSON.stringify(e)}`);
+			logError(`${error.message}: ${JSON.stringify(e)}`);
 		}
 	});
 </script>

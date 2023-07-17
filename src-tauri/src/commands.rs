@@ -164,7 +164,7 @@ pub async fn set_state(config: Config, state: State<'_, app::MutexState>) -> Res
         connection.sftp_client.close().await?;
         connection.ssh_session.close().await?;
     };
-    
+
     _ = state.config.lock()?.insert(config.clone());
     let app_cache_dir = state.app_cache_dir.lock()?.clone();
     let connection = Connection::new(config, app_cache_dir).await?;
@@ -314,12 +314,32 @@ pub fn terminate_background_backup(
     let result = pool.terminate_job(*worker_id, || {
         let file_path = format!("{}/.bmu_event_trigger", backup.client_location.path);
 
-        if let Err(e) = Command::new("touch").args([&file_path]).status() {
-            error!("Error: {e:?}");
+        match Command::new("touch").args([&file_path]).output() {
+            Ok(output) => {
+                if !output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                    let why = format!("Failed to create file: {stdout}\n{stderr}");
+                    error!("{why}");
+                }
+            }
+            Err(e) => {
+                error!("Failed to create file: {e:?}");
+            }
         }
 
-        if let Err(e) = Command::new("rm").args([&file_path]).status() {
-            error!("Error: {e:?}");
+        match Command::new("rm").args([&file_path]).output() {
+            Ok(output) => {
+                if !output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                    let why = format!("Failed to remove file: {stdout}\n{stderr}");
+                    error!("{why}");
+                }
+            }
+            Err(e) => {
+                error!("Failed to remove file: {e:?}");
+            }
         }
     });
 
@@ -431,11 +451,18 @@ pub fn start_background_backups(
 #[tauri::command]
 pub fn get_client_name() -> Result<String, Error> {
     // TODO: use 'hostname' command for windows
-    let output = Command::new("uname")
+    let uname = Command::new("uname")
         .arg("-n") // -n flag to get the network node hostname
         .output()?;
 
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    if uname.status.success() {
+        Ok(String::from_utf8_lossy(&uname.stdout).trim().to_string())
+    } else {
+        let stdout = String::from_utf8_lossy(&uname.stdout).trim().to_string();
+        let stderr = String::from_utf8_lossy(&uname.stderr).trim().to_string();
+        let why = format!("Getting hostname with command 'uname' failed: {stdout}\n{stderr}");
+        Err(Error::Command(why))
+    }
 }
 
 #[tauri::command]

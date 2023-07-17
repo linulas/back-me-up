@@ -32,13 +32,15 @@ pub fn backup_to_server(backup: &Backup, config: &Config) -> Result<(), Error> {
         .arg("--exclude=.*")
         .arg(&backup.client_location.path)
         .arg(&connection_string)
-        .status()
-        .expect("Failed to execute rsync command");
+        .output()?;
 
-    if rsync.success() {
+    if rsync.status.success() {
         Ok(())
     } else {
-        Err(Error::Command(String::from("rysnc command failed")))
+        let stdout = String::from_utf8_lossy(&rsync.stdout).trim().to_string();
+        let stderr = String::from_utf8_lossy(&rsync.stderr).trim().to_string();
+        let why = format!("{stdout}\n{stderr}");
+        Err(Error::Command(format!("Rsync failed: {why}")))
     }
 }
 
@@ -58,12 +60,18 @@ pub fn delete_from_server(backup: &Backup, config: &Config) -> Result<(), Error>
             &connection_string,
             &delete_command_string,
         ])
-        .status()
-        .expect("Failed to execute {delete_command_string}");
+        .output()?;
 
-    if ssh_delete.success() {
+    if ssh_delete.status.success() {
         Ok(())
     } else {
-        Err(Error::Command(String::from("SSH delete command failed")))
+        let stdout = String::from_utf8_lossy(&ssh_delete.stdout)
+            .trim()
+            .to_string();
+        let stderr = String::from_utf8_lossy(&ssh_delete.stderr)
+            .trim()
+            .to_string();
+        let why = format!("{stdout}\n{stderr}");
+        Err(Error::Command(format!("SSH delete command failed: {why}")))
     }
 }
