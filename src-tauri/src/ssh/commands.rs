@@ -1,6 +1,7 @@
 use super::Error;
 use crate::models::app::Config;
 use crate::models::backup::Backup;
+use log::info;
 use openssh_sftp_client::Sftp;
 use std::path::Path;
 use std::process::Command;
@@ -9,7 +10,7 @@ pub async fn assert_client_directory_on_server(client: &Sftp, path: &Path) -> Re
     match client.open(&path).await {
         Ok(_) => Ok(()),
         Err(e) => {
-            println!("Error: {e:?}");
+            info!("Client directory does not exist: {e:?}\nCreating directory...");
             client.fs().create_dir(&path).await?;
             Ok(())
         }

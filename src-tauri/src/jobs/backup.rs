@@ -3,6 +3,7 @@ use crate::models::app::{self, Config};
 use crate::models::backup::{Backup, Location};
 use crate::ssh;
 use chrono::{DateTime, Local};
+use log::{error, info};
 use notify::{self, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 use std::io;
@@ -36,14 +37,14 @@ pub fn directory_on_change(worker: &Arguments, backup: &Backup, config: Config) 
         .watch(path.as_ref(), RecursiveMode::Recursive)
         .expect("failed to watch directory");
 
-    println!("watching {}", &backup.client_location.path);
+    info!("watching {}", &backup.client_location.path);
 
     loop {
         let response = worker_receiver.recv();
         let thread_message = match response {
             Ok(message) => message,
             Err(e) => {
-                println!("thread receiver error: {e:?}");
+                error!("thread message failed: {e:?}");
                 continue;
             }
         };
@@ -58,7 +59,7 @@ pub fn directory_on_change(worker: &Arguments, backup: &Backup, config: Config) 
         let watcher_res = match receiver.recv() {
             Ok(response) => response,
             Err(e) => {
-                println!("notify receiver error: {e:?}");
+                error!("notify receiver failed: {e:?}");
                 continue;
             }
         };
@@ -69,16 +70,16 @@ pub fn directory_on_change(worker: &Arguments, backup: &Backup, config: Config) 
                     handle_notify_error(&e, &event, &job);
                 }
             }
-            Err(e) => println!("notify event error: {e:?}"),
+            Err(e) => error!("notify event failed: {e:?}"),
         };
 
         match worker.sender.lock() {
             Ok(sender) => {
                 if let Err(e) = sender.send(ThreadAction::Continue) {
-                    println!("Error sending continue message: {e:?}");
+                    error!("Could not send continue message to thread: {e:?}");
                 }
             }
-            Err(e) => println!("Error locking worker sender: {e:?}"),
+            Err(e) => error!("Could not lock worker sender: {e:?}"),
         };
     }
 }
@@ -90,7 +91,7 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
     };
 
     if !error_is_of_kind_not_found {
-        println!("error handling notify error: {e:?}");
+        error!("Will not handle the following notify error: {e:?}");
         return;
     }
 
@@ -100,7 +101,7 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
         let client_folder_path = job.backup.client_location.path.replace(' ', r"\ ");
         // make sure to not delete root folder for the backup
         if target_path == server_folder_path {
-            println!("Ignoring deletion of {target_path}");
+            info!("Ignoring deletion of {target_path}");
             return;
         }
 
@@ -129,11 +130,11 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
             latest_run: None,
         };
 
-        println!("Deleting {}", backup_realtive_to_root.server_location.path);
+        info!("Deleting {}", backup_realtive_to_root.server_location.path);
         let result = ssh::commands::delete_from_server(&backup_realtive_to_root, &job.config);
 
         if let Err(e) = result {
-            println!("delete error: {e:?}");
+            error!("Could not delete_from_server: {e:?}");
         }
     }
 }
@@ -159,7 +160,7 @@ pub fn exec_backup_command(
         .unwrap_or_default()
         .starts_with('.')
     {
-        println!("Ignoring hidden entity: {path:?}");
+        info!("Ignoring hidden entity: {path:?}");
         return Ok(());
     }
 
@@ -172,7 +173,7 @@ pub fn exec_backup_command(
             .to_str()
             .unwrap_or_default(),
     ) {
-        println!("Ignoring file with blacklisted extention: {path:?}");
+        info!("Ignoring file with blacklisted extention: {path:?}");
     }
 
     let data = path.metadata()?;
@@ -181,7 +182,7 @@ pub fn exec_backup_command(
     let new_modified_date: DateTime<Local> = root_path.metadata()?.modified()?.into();
 
     if new_modified_date.timestamp() <= latest_modified.timestamp() {
-        println!("Ignoring already up to date entity: {path:?}");
+        info!("Ignoring already up to date entity: {path:?}");
         return Ok(());
     }
 
@@ -209,15 +210,14 @@ pub fn exec_backup_command(
 
     // TODO: make type for FILE
     if data.is_dir() {
-        println!("Backup directory: {path:?}");
+        info!("Backup directory: {path:?}");
     } else {
-        println!("Backup file: {path:?}");
+        info!("Backup file: {path:?}");
     }
 
     *latest_modified = entity_modified_date;
-    let result = ssh::commands::backup_to_server(&backup_realtive_to_root, &job.config);
-    if let Err(e) = result {
-        println!("Error: {e:?}");
+    if let Err(e) = ssh::commands::backup_to_server(&backup_realtive_to_root, &job.config) {
+        error!("Could not backup: {e:?}");
     }
 
     Ok(())
@@ -242,21 +242,21 @@ fn handle_notify_event(
 #[allow(clippy::needless_pass_by_value)]
 pub fn terminate_all(jobs: &mut MutexGuard<HashMap<String, usize>>, pool: &mut MutexGuard<Pool>) {
     jobs.iter_mut().for_each(|(job_id, worker)| {
-        println!("Terminating job: {job_id}");
+        info!("Terminating job: {job_id}");
         let client_folder_path = job_id.split('_').next().expect("Could not split job_id");
 
         if let Err(why) = pool.terminate_job(*worker, || {
             let file_path = format!("{client_folder_path}/.bmu_event_trigger");
 
             if let Err(e) = Command::new("touch").args([&file_path]).status() {
-                println!("Error: {e:?}");
+                error!("Could not execute touch command: {e:?}");
             }
 
             if let Err(e) = Command::new("rm").args([&file_path]).status() {
-                println!("Error: {e:?}");
+                error!("Could not execute rm command: {e:?}");
             }
         }) {
-            println!("Error terminating job: {why}");
+            error!("Could not terminate job: {why}");
         };
     });
 

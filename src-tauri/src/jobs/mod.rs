@@ -1,5 +1,6 @@
 use crate::models::app;
 use crate::models::backup::Backup;
+use log::{info, warn};
 use serde::Serialize;
 use ts_rs::TS;
 use std::collections::HashMap;
@@ -157,7 +158,7 @@ impl Pool {
 
     pub fn create_workers(&mut self, size: usize) {
         if size == 0 {
-            println!("size must be greater than 0");
+            warn!("size must be greater than 0");
             return;
         }
 
@@ -165,7 +166,7 @@ impl Pool {
             let id = self.workers.len() + 1;
             let mut worker = Worker::new(id, Arc::clone(&self.receiver));
             worker.start();
-            println!("Adding new worker width id {id}");
+            info!("Adding new worker width id {id}");
             self.workers.push(worker);
         }
     }
@@ -181,11 +182,11 @@ impl Pool {
     }
 
     pub fn stop_all_workers(&mut self) {
-        println!("Sending terminate message to all workers.");
+        info!("Sending terminate message to all workers.");
 
         for worker in &mut self.workers {
             if let Err(e) = self.sender.send(Message::Terminate(worker.id)) {
-                println!("Error sending terminate message: {e:?}");
+                info!("Error sending terminate message: {e:?}");
             }
         }
 
@@ -193,14 +194,14 @@ impl Pool {
             match worker.thread.take() {
                 Some(thread) => match thread.join() {
                     Ok(_) => {
-                        println!("Worker {} terminated.", worker.id);
+                        info!("Worker {} terminated.", worker.id);
                     }
                     Err(e) => {
-                        println!("Error shutting down worker {}: {e:?}", worker.id);
+                        info!("Error shutting down worker {}: {e:?}", worker.id);
                     }
                 },
                 None => {
-                    println!("Worker {} already terminated.", worker.id);
+                    info!("Worker {} already terminated.", worker.id);
                 }
             }
         }
@@ -261,7 +262,7 @@ impl Worker {
     }
 
     pub fn start(&mut self) {
-        println!("Starting worker {}", self.id);
+        info!("Starting worker {}", self.id);
         let local_sender = Arc::clone(&self.local_sender);
         let local_receiver = Arc::clone(&self.local_receiver);
 
@@ -292,15 +293,15 @@ impl Worker {
             match message {
                 Message::New(job) => {
                     *is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK) = false;
-                    println!("Worker {id} got a job; executing.");
+                    info!("Worker {id} got a job; executing.");
 
                     job.call_box(arguments.clone());
-                    println!("Worker {id} finished.");
+                    info!("Worker {id} finished.");
                     *is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK) = true;
                 }
                 Message::Terminate(termination_id) => {
                     if termination_id == id {
-                        println!("Worker {id} was told to terminate.");
+                        info!("Worker {id} was told to terminate.");
                         *is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK) = true;
                         break;
                     }

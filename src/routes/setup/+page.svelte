@@ -8,7 +8,8 @@
 	import { SERVER_CONFIG_FILE_NAME } from '$lib/app_files';
 	import { invoke } from '@tauri-apps/api/tauri';
 	import { onMount } from 'svelte';
-  import { randomString } from '$lib/generate';
+	import { randomString } from '$lib/generate';
+	import { error as logError } from 'tauri-plugin-log-api';
 
 	import type { Config } from '../../../src-tauri/bindings/Config';
 
@@ -54,12 +55,12 @@
 				state = 'success';
 			})
 			.catch((e) => {
-				console.error(e);
 				state = 'error';
 				serverConfig.set(undefined);
 				error = {
 					message: "Couldn't establish a server connection based on your config"
 				};
+				logError(`Client log: ${error.message}: ${JSON.stringify(e)}`);
 			});
 
 		if (error) return;
@@ -72,7 +73,7 @@
 		} catch (e) {
 			state = 'error';
 			error = { message: 'Could not write config file' };
-			console.error(e);
+			logError(`Client log: ${error.message}: ${JSON.stringify(e)}`);
 		}
 	};
 
@@ -81,7 +82,7 @@
 			client_name = await invoke('get_client_name');
 		} catch (e) {
 			error = { message: 'Could not get client name' };
-			console.error(e);
+			logError(`Client log: ${error.message}: ${JSON.stringify(e)}`);
 		}
 	});
 </script>

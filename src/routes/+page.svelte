@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { open } from '@tauri-apps/api/dialog';
 	import { onDestroy, onMount } from 'svelte';
+	import { error as appError } from '@sveltejs/kit';
 	import { extractFileNameFromPath } from '$lib/parse';
 	import { init, isRedirect } from './init';
 	import { goto } from '$app/navigation';
@@ -27,6 +28,7 @@
 	let target_server_folder: string | undefined;
 	let button_states: { [key: string]: ButtonState } = {};
 	let error: App.Error | undefined;
+	let initError: App.Error | undefined;
 
 	$: selectItems = server_home_folders.map((folder) => ({
 		title: folder.name,
@@ -174,8 +176,8 @@
 			.then((data) => {
 				server_home_folders = data;
 			})
-			.catch((err) => {
-				if (isRedirect(err)) goto(err.location);
+			.catch(() => {
+				initError = { message: 'Failed to load config' };
 			});
 	};
 
@@ -186,70 +188,75 @@
 	});
 </script>
 
-<div class={$clientConfig.theme}>
-	<Modal open={new_folder_to_backup !== undefined}>
-		<div class="modal">
-			<div class="form_group">
-				<label for="server_home_folders">Select target folder on the server</label>
-				<Select items={selectItems} bind:value={target_server_folder} />
-			</div>
-			<Button type="secondary" onClick={addNewBackup}>Backup</Button>
-		</div>
-	</Modal>
-	<div class="heading">
-		<h1>Your backups</h1>
-		<div>
-			<Button type="primary" onClick={selectNewFolderToBackup}>
-				New <AddIcon slot="icon" />
-			</Button>
-		</div>
-	</div>
-	{#if error}
-		<p class="error">{error.message}</p>
-	{/if}
-	{#if $backups.length > 0}
-		<div class="backups">
-			<div class="grid grid-heading">
-				<div>
-					<div>Local folder</div>
+{#if !initError && $serverConfig?.server_address}
+	<div class={$clientConfig.theme}>
+		<Modal open={new_folder_to_backup !== undefined}>
+			<div class="modal">
+				<div class="form_group">
+					<label for="server_home_folders">Select target folder on the server</label>
+					<Select items={selectItems} bind:value={target_server_folder} />
 				</div>
-				<div />
-				<div>
-					<div>Server folder</div>
-				</div>
+				<Button type="secondary" onClick={addNewBackup}>Backup</Button>
 			</div>
-			{#each $backups as backup}
-				{@const backupKey = `${backup.client_location.entity_name}_${backup.server_location.entity_name}`}
-				<div class="backup grid">
-					<div class="folder">
-						<div>
-							<Button type="icon" onClick={() => deleteBackup(backup)} style="padding-left: 0">
-								<TrashIcon color="#ef4444" />
-							</Button>
-							<span>
-								{backup.client_location.entity_name}
-							</span>
+		</Modal>
+		<div class="heading">
+			<h1>Your backups</h1>
+			<div>
+				<Button type="primary" onClick={selectNewFolderToBackup}>
+					New <AddIcon slot="icon" />
+				</Button>
+			</div>
+		</div>
+		{#if error}
+			<p class="error">{error.message}</p>
+		{/if}
+		{#if $backups.length > 0}
+			<div class="backups">
+				<div class="grid grid-heading">
+					<div>
+						<div>Local folder</div>
+					</div>
+					<div />
+					<div>
+						<div>Server folder</div>
+					</div>
+				</div>
+				{#each $backups as backup}
+					{@const backupKey = `${backup.client_location.entity_name}_${backup.server_location.entity_name}`}
+					<div class="backup grid">
+						<div class="folder">
+							<div>
+								<Button type="icon" onClick={() => deleteBackup(backup)} style="padding-left: 0">
+									<TrashIcon color="#ef4444" />
+								</Button>
+								<span>
+									{backup.client_location.entity_name}
+								</span>
+							</div>
+						</div>
+						<!-- TODO: add a "backup up to date" state -->
+						<Button
+							type="icon-with_background"
+							onClick={() => backupDirectory(backup)}
+							style="align-self: center;"
+							state={button_states[backupKey] || 'idle'}
+						>
+							<ArrowIcon slot="icon" color="white" />
+						</Button>
+						<div class="folder">
+							<div>{backup.server_location.entity_name}</div>
 						</div>
 					</div>
-					<!-- TODO: add a "backup up to date" state -->
-					<Button
-						type="icon-with_background"
-						onClick={() => backupDirectory(backup)}
-						style="align-self: center;"
-						state={button_states[backupKey] || 'idle'}
-					>
-						<ArrowIcon slot="icon" color="white" />
-					</Button>
-					<div class="folder">
-						<div>{backup.server_location.entity_name}</div>
-					</div>
-				</div>
-			{/each}
-		</div>
-	{:else}
-		<div>No backups</div>
-	{/if}
-</div>
+				{/each}
+			</div>
+		{:else}
+			<div>No backups</div>
+		{/if}
+	</div>
+{:else if initError}
+	<h1>Internal server error</h1>
+	<p>{initError.message}</p>
+{/if}
 
 <style lang="scss">
 	.heading {

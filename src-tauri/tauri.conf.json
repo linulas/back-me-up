@@ -23,7 +23,16 @@
 				"readFile": true,
 				"removeFile": true,
 				"writeFile": true,
-				"scope": ["$CONFIG", "$CONFIG/*/**", "$APPCONFIG", "$APPCONFIG/*/**"]
+				"scope": [
+					"$CACHE",
+					"$CACHE/*/**",
+					"$CONFIG",
+					"$CONFIG/*/**",
+					"$APPCONFIG",
+					"$APPCONFIG/*/**",
+					"$APPLOG",
+					"$APPLOG/*/**"
+				]
 			},
 			"path": {
 				"all": true
@@ -53,7 +62,7 @@
 				"icons/icon.icns",
 				"icons/icon.ico"
 			],
-			"identifier": "bmu",
+			"identifier": "BackMeUp",
 			"longDescription": "",
 			"macOS": {
 				"entitlements": null,

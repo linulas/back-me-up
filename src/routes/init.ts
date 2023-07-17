@@ -4,10 +4,12 @@ import { exists, createDir, readTextFile, BaseDirectory, writeTextFile } from '@
 import { appConfigDir } from '@tauri-apps/api/path';
 import { backups, serverConfig } from '$lib/store';
 import { BACKUPS_FILE_NAME, SERVER_CONFIG_FILE_NAME } from '$lib/app_files';
+import { info, error as logError } from 'tauri-plugin-log-api';
 
 import type { Redirect } from '@sveltejs/kit';
 import type { Folder } from '../../src-tauri/bindings/Folder';
 import type { Config } from '../../src-tauri/bindings/Config';
+import { goto } from '$app/navigation';
 
 export const isRedirect = (someError: any): someError is Redirect => someError?.status === 302;
 
@@ -15,8 +17,8 @@ const getServerHomeFolders = async () => {
 	try {
 		return await invoke<Folder[]>('list_home_folders');
 	} catch (e) {
-		console.error(e);
 		const appError: App.Error = { message: "Couldn't get server home folders" };
+		logError(`Client log: ${appError.message}: ${JSON.stringify(e)}`);
 		throw error(500, appError);
 	}
 };
@@ -28,7 +30,7 @@ const setStateOnServer = async (config: Config) => {
 		const appError: App.Error = {
 			message: "Couldn't establish a server connection based on your config"
 		};
-		console.error(e);
+		logError(`Client log: ${appError.message}: ${JSON.stringify(e)}`);
 		throw error(500, appError);
 	}
 };
@@ -38,8 +40,9 @@ const createConfigDirectory = async () => {
 		const appConfigPath = await appConfigDir();
 		await createDir(appConfigPath);
 	} catch (e) {
-		console.error(e);
-		throw error(500, { message: "Couldn't create config directory" });
+		const message = `Couldn't create config directory`;
+		logError(`Client log: ${message}: ${JSON.stringify(e)}`);
+		throw error(500, { message });
 	}
 };
 
@@ -47,7 +50,7 @@ const appConfigDirectoryExists = async () => {
 	try {
 		return await exists(await appConfigDir());
 	} catch (e) {
-		console.error(e);
+		logError(JSON.stringify(e));
 		return false;
 	}
 };
@@ -57,8 +60,9 @@ const configFileExist = async () => {
 	try {
 		return await exists(SERVER_CONFIG_FILE_NAME, options);
 	} catch (e) {
-		console.error(e);
-		throw error(500, { message: 'Error checking if config file exists' });
+		const message = `Error checking if config file exists`;
+		logError(`Client log: ${message}: ${JSON.stringify(e)}`);
+		throw error(500, { message });
 	}
 };
 
@@ -71,7 +75,7 @@ export const loadStoredBackupsAndSetToState = async () => {
 
 		backups.set(JSON.parse(await readTextFile(BACKUPS_FILE_NAME, options)));
 	} catch (e) {
-		console.error(e);
+		logError(JSON.stringify(e));
 	}
 };
 
@@ -99,8 +103,13 @@ export const init = async () => {
 
 		return server_home_folders;
 	} catch (e) {
-		if (isRedirect(e)) throw e;
-		console.error(e);
-		throw error(500, { message: "Couldn't load config" });
+		if (isRedirect(e)) {
+			info('No config found, redirecting to setup');
+			await goto(e.location);
+		} else {
+			const message = "Couldn't load config";
+			logError(`Client log: ${message}: ${JSON.stringify(e)}`);
+			throw error(500, { message });
+		}
 	}
 };

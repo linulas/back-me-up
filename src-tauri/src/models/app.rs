@@ -2,7 +2,8 @@ use crate::jobs::{self, Pool};
 use crate::ssh::connect::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, PoisonError, MutexGuard};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use ts_rs::TS;
 
 #[derive(Debug, Serialize)]
@@ -10,6 +11,7 @@ pub enum Error {
     MissingConnection(String),
     Config(String),
     JobPool(String),
+    Storage(String)
 }
 
 impl From<PoisonError<MutexGuard<'_, Option<Config>>>> for Error {
@@ -30,7 +32,13 @@ impl From<PoisonError<MutexGuard<'_, HashMap<String, usize>>>> for Error {
     }
 }
 
-#[derive(TS, Deserialize, Clone)]
+impl From<PoisonError<MutexGuard<'_, PathBuf>>> for Error {
+    fn from(e: PoisonError<MutexGuard<PathBuf>>) -> Self {
+        Self::Storage(e.to_string())
+    }
+}
+
+#[derive(TS, Deserialize, Clone, Debug)]
 #[ts(export)]
 pub struct Config {
     pub client_name: String,
@@ -46,4 +54,5 @@ pub struct MutexState {
     pub jobs: Arc<Mutex<jobs::Active>>,
     pub failed_jobs: Arc<Mutex<jobs::Failed>>,
     pub pool: Mutex<jobs::Pool>,
+    pub app_cache_dir: Arc<Mutex<PathBuf>>,
 }

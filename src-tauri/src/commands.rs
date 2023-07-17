@@ -4,10 +4,13 @@ use crate::models::backup::Backup;
 use crate::models::storage::{Folder, Size};
 use crate::ssh::{self, connect::Connection};
 use futures::TryStreamExt;
+use glob::{glob, PatternError};
+use log::{debug, error, info};
 use openssh_sftp_client::fs::DirEntry;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, MutexGuard, PoisonError};
 use tauri::State;
@@ -68,6 +71,24 @@ impl From<std::io::Error> for Error {
     }
 }
 
+impl From<PatternError> for Error {
+    fn from(e: PatternError) -> Self {
+        Self::Command(e.to_string())
+    }
+}
+
+impl From<PoisonError<MutexGuard<'_, PathBuf>>> for Error {
+    fn from(e: PoisonError<MutexGuard<PathBuf>>) -> Self {
+        Self::App(app::Error::from(e))
+    }
+}
+
+impl From<openssh::Error> for Error {
+    fn from(e: openssh::Error) -> Self {
+        Self::Ssh(ssh::Error::Connection(e))
+    }
+}
+
 #[tauri::command]
 pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<Folder>, Error> {
     let connection_mutex_guard = state.connection.lock().await;
@@ -107,7 +128,7 @@ pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<
         let mutex_guard = match state.config.lock() {
             Ok(guard) => guard,
             Err(e) => {
-                println!("Error getting config: {e}");
+                error!("Could not get config: {e}");
                 continue;
             }
         };
@@ -115,7 +136,7 @@ pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<
         let config = if let Some(config) = mutex_guard.as_ref() {
             config
         } else {
-            println!("config was empty");
+            error!("config was empty");
             continue;
         };
 
@@ -135,8 +156,18 @@ pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<
 
 #[tauri::command]
 pub async fn set_state(config: Config, state: State<'_, app::MutexState>) -> Result<(), Error> {
+    debug!("App cache dir is {:?}", state.app_cache_dir.lock()?);
+    debug!("{config:?}");
+
+    if let Some(connection) = state.connection.lock().await.take() {
+        info!("Closing connection");
+        connection.sftp_client.close().await?;
+        connection.ssh_session.close().await?;
+    };
+    
     _ = state.config.lock()?.insert(config.clone());
-    let connection = Connection::new(config).await?;
+    let app_cache_dir = state.app_cache_dir.lock()?.clone();
+    let connection = Connection::new(config, app_cache_dir).await?;
     state.connection.lock().await.get_or_insert(connection);
 
     Ok(())
@@ -173,7 +204,10 @@ pub async fn backup_entity(
         return Err(Error::App(error));
     };
 
-    let folder_to_assert = format!("./{}/{}", backup.server_location.entity_name, config.client_name);
+    let folder_to_assert = format!(
+        "./{}/{}",
+        backup.server_location.entity_name, config.client_name
+    );
 
     let path = Path::new(&folder_to_assert);
     ssh::commands::assert_client_directory_on_server(client, path).await?;
@@ -200,7 +234,7 @@ pub async fn backup_entity(
                 jobs.lock().expect("Could not lock jobs").remove(&job_id);
             }
             Err(e) => {
-                println!("{e:?}");
+                error!("{e:?}");
                 jobs.lock().expect("Could not lock jobs").remove(&job_id);
                 failed_jobs
                     .lock()
@@ -243,7 +277,7 @@ pub fn backup_on_change(state: State<'_, app::MutexState>, backup: Backup) -> Re
     let jobs = Arc::clone(&state.jobs);
 
     if jobs.lock()?.iter().any(|(id, _)| id == &job_id) {
-        println!(
+        info!(
             "Already running background backup for {}",
             backup.client_location.path
         );
@@ -281,11 +315,11 @@ pub fn terminate_background_backup(
         let file_path = format!("{}/.bmu_event_trigger", backup.client_location.path);
 
         if let Err(e) = Command::new("touch").args([&file_path]).status() {
-            println!("Error: {e:?}");
+            error!("Error: {e:?}");
         }
 
         if let Err(e) = Command::new("rm").args([&file_path]).status() {
-            println!("Error: {e:?}");
+            error!("Error: {e:?}");
         }
     });
 
@@ -348,9 +382,9 @@ pub fn start_background_backups(
     let backup_jobs_that_are_not_already_running: Vec<_> = backups
         .iter()
         .filter(|b| {
-            !jobs.iter().any(|(job_id, _)| {
-                job_id == &jobs::id_from_backup(b, &jobs::Kind::BackupOnChange)
-            })
+            !jobs
+                .iter()
+                .any(|(job_id, _)| job_id == &jobs::id_from_backup(b, &jobs::Kind::BackupOnChange))
         })
         .collect();
 
@@ -411,12 +445,25 @@ pub fn check_job_status(
     id: String,
 ) -> Result<jobs::Status, Error> {
     if state.failed_jobs.lock()?.contains_key(&id) {
-        println!("{id}: failed");
+        error!("{id}: failed");
         return Ok(jobs::Status::Failed);
     } else if state.jobs.lock()?.contains_key(&id) {
         return Ok(jobs::Status::Running);
     }
 
-    println!("{id}: completed");
+    info!("{id}: completed");
     Ok(jobs::Status::Completed)
+}
+
+pub fn cleanup_entities_by_pattern(pattern: &str) -> Result<(), Error> {
+    for path in (glob(pattern)?).flatten() {
+        if path.is_file() {
+            fs::remove_file(path)?;
+        } else if path.is_dir() {
+            fs::remove_dir_all(path)?;
+        }
+    }
+
+    info!("cleanup successfull!");
+    Ok(())
 }
