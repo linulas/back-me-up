@@ -86,7 +86,9 @@
 			"csp": null
 		},
 		"updater": {
-			"active": false
+			"active": true,
+			"endpoints": ["https://gist.githubusercontent.com/linulas/a099576d63408955226344322e2942b8/raw/bmu_latest.json"],
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVBOEM3QjA2MDcxNzExQ0IKUldUTEVSY0hCbnVNNnRPRzl3RXhnL3I1V0Z6VXIxdmNldDBHWDRobzlHVG1oR0N2dTZZVmlUaVoK"
 		},
 		"windows": [
 			{
