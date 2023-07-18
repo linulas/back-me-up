@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import { invoke } from '@tauri-apps/api/tauri';
 import { exists, createDir, readTextFile, BaseDirectory, writeTextFile } from '@tauri-apps/api/fs';
-import { appConfigDir } from '@tauri-apps/api/path';
+import { appConfigDir, appDataDir } from '@tauri-apps/api/path';
 import { backups, serverConfig } from '$lib/store';
 import { BACKUPS_FILE_NAME, SERVER_CONFIG_FILE_NAME } from '$lib/app_files';
 import { info, error as logError } from 'tauri-plugin-log-api';
@@ -35,7 +35,7 @@ const setStateOnServer = async (config: Config) => {
 	}
 };
 
-const createConfigDirectory = async () => {
+export const createConfigDirectory = async () => {
 	try {
 		const appConfigPath = await appConfigDir();
 		await createDir(appConfigPath);
@@ -46,7 +46,7 @@ const createConfigDirectory = async () => {
 	}
 };
 
-const appConfigDirectoryExists = async () => {
+export const appConfigDirectoryExists = async () => {
 	try {
 		return await exists(await appConfigDir());
 	} catch (e) {
@@ -63,6 +63,26 @@ const configFileExist = async () => {
 		const message = `Error checking if config file exists`;
 		logError(`${message}: ${JSON.stringify(e)}`);
 		throw error(500, { message });
+	}
+};
+
+const createDataDirectory = async () => {
+	try {
+		const appDataPath = await appDataDir();
+		await createDir(appDataPath);
+	} catch (e) {
+		const message = `Couldn't create data directory`;
+		logError(`${message}: ${JSON.stringify(e)}`);
+		throw error(500, { message });
+	}
+};
+
+const appDataDirectoryExists = async () => {
+	try {
+		return await exists(await appDataDir());
+	} catch (e) {
+		logError(JSON.stringify(e));
+		return false;
 	}
 };
 
@@ -90,6 +110,10 @@ export const init = async () => {
 	try {
 		if (!(await appConfigDirectoryExists())) {
 			await createConfigDirectory();
+		}
+
+		if (!(await appDataDirectoryExists())) {
+			await createDataDirectory();
 		}
 
 		if (!(await configFileExist())) {

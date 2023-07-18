@@ -10,6 +10,7 @@
 	import { onMount } from 'svelte';
 	import { randomString } from '$lib/generate';
 	import { error as logError } from 'tauri-plugin-log-api';
+	import { appConfigDirectoryExists, createConfigDirectory } from '../init';
 
 	import type { Config } from '../../../src-tauri/bindings/Config';
 
@@ -66,6 +67,9 @@
 		if (error) return;
 
 		try {
+			if (!(await appConfigDirectoryExists())) {
+				await createConfigDirectory();
+			}
 			await writeTextFile(SERVER_CONFIG_FILE_NAME, JSON.stringify(newConfig), {
 				dir: BaseDirectory.AppConfig
 			});
