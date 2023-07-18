@@ -13,6 +13,8 @@ interface UpdateInfo {
 
 export const checkForUpdate = async (): Promise<UpdateInfo> => {
 	try {
+    info('Checking for update...');
+
 		const { shouldUpdate, manifest } = await checkUpdate();
 
 		info(JSON.stringify({ shouldUpdate, manifest }));

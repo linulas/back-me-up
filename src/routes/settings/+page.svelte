@@ -10,15 +10,16 @@
 	import { loadStoredBackupsAndSetToState, loadStoredConfigAndSetToState } from '../init';
 	import { onUpdaterEvent } from '@tauri-apps/api/updater';
 	import { info, error as logError } from 'tauri-plugin-log-api';
+	import { checkForUpdate } from '$lib/update';
+	import { sleep } from '$lib/concurrency';
 
 	import type { Config } from '../../../src-tauri/bindings/Config';
 	import type { Backup } from '../../../src-tauri/bindings/Backup';
-	import { checkForUpdate } from '$lib/update';
 
 	let error: App.Error | undefined = undefined;
 	let disconnected = false;
 	let loading = false;
-	let updateStatus: ButtonState = 'loading';
+	let updateStatus: ButtonState = 'idle';
 
 	$: if (disconnected) {
 		appWindow.close();
@@ -26,6 +27,13 @@
 
 	$: if ($serverConfig) {
 		emit('server-config-updated', $serverConfig).catch((e) => console.error(e));
+	}
+
+	$: if (updateStatus === 'loading') {
+		// NOTE: if user aborts the update, the promise will never resolve, this ensures that the loading spinner stops
+		sleep(10000)
+			.then(() => (updateStatus = 'idle'))
+			.catch();
 	}
 
 	const unlistenBackupsUpdate = listen<Backup[]>('backups-updated', ({ payload }) => {
