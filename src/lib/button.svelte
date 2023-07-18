@@ -9,6 +9,7 @@
 
 	export let onClick: () => void;
 	export let style = '';
+  export let loadingColor: string = "white";
 </script>
 
 <button class={`${type} ${state} ${$clientConfig.theme}`} on:click={onClick} {style}>
@@ -16,7 +17,7 @@
 	{#if $$slots.icon}
 		<span>
 			{#if state === 'loading'}
-				<TadpoleIcon color="white" />
+				<TadpoleIcon color={loadingColor} />
 			{:else if state === 'error'}
 				<ErrorIcon color="#ef4444" />
 			{:else if state === 'success'}

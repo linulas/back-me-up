@@ -15,11 +15,14 @@
 	import Modal from '$lib/modal.svelte';
 	import { sleep } from '$lib/concurrency';
 	import { emit, listen } from '@tauri-apps/api/event';
+	import { checkForUpdate } from '$lib/update';
+	import { onUpdaterEvent } from '@tauri-apps/api/updater';
 
 	import type { Folder } from '../../src-tauri/bindings/Folder';
 	import type { Backup } from '../../src-tauri/bindings/Backup';
 	import type { Config } from '../../src-tauri/bindings/Config';
 	import type { JobStatus } from '../../src-tauri/bindings/JobStatus';
+	import { info, error as logError } from 'tauri-plugin-log-api';
 
 	let server_home_folders: Folder[] = [];
 	let new_folder_to_backup: Folder | undefined;
@@ -69,6 +72,26 @@
 
 	const unlistenRefreshServerConfig = listen<Config>('server-config-updated', ({ payload }) => {
 		payload && serverConfig.update(() => payload);
+	});
+
+	const unlistenUpdater = onUpdaterEvent(async ({ error: updaterErrorMessage, status }) => {
+		switch (status) {
+			case 'ERROR':
+				updaterErrorMessage && logError(updaterErrorMessage);
+				error = {
+					message: `Failed to update app\n${updaterErrorMessage}`
+				};
+				break;
+			case 'PENDING':
+				info('Checking for updates');
+				break;
+			case 'DONE':
+				info('App updated to latest version');
+				break;
+			case 'UPTODATE':
+				info('App is already up to date');
+				break;
+		}
 	});
 
 	const backupDirectory = async (backup: Backup) => {
@@ -183,6 +206,7 @@
 	onDestroy(async () => {
 		(await unlistenReset)();
 		(await unlistenRefreshServerConfig)();
+		(await unlistenUpdater)();
 	});
 </script>
 
@@ -206,7 +230,7 @@
 			</div>
 		</div>
 		{#if error}
-			<p class="error">{error.message}</p>
+			<p class="error">{@html error.message.replace(/\n/g, '<br>')}</p>
 		{/if}
 		{#if $backups.length > 0}
 			<div class="backups">
