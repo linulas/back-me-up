@@ -200,7 +200,6 @@
 			.catch(() => {
 				initError = { message: 'Failed to load config' };
 			});
-		checkForUpdate();
 	};
 
 	onMount(loadConfig);
