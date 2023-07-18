@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { open } from '@tauri-apps/api/dialog';
 	import { onDestroy, onMount } from 'svelte';
-	import { error as appError } from '@sveltejs/kit';
 	import { extractFileNameFromPath } from '$lib/parse';
-	import { init, isRedirect } from './init';
-	import { goto } from '$app/navigation';
+	import { init } from './init';
 	import { invoke } from '@tauri-apps/api/tauri';
 	import { backups, clientConfig, clientDefaults, serverConfig } from '$lib/store';
 	import { BaseDirectory, writeTextFile } from '@tauri-apps/api/fs';
@@ -174,7 +172,7 @@
 	const loadConfig = async () => {
 		init()
 			.then((data) => {
-				server_home_folders = data;
+				server_home_folders = data || [];
 			})
 			.catch(() => {
 				initError = { message: 'Failed to load config' };

@@ -30,6 +30,8 @@
 					"$CONFIG/*/**",
 					"$APPCONFIG",
 					"$APPCONFIG/*/**",
+					"$APPDATA",
+					"$APPDATA/*/**",
 					"$APPLOG",
 					"$APPLOG/*/**"
 				]

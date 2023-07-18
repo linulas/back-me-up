@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use self::models::app::MutexState;
 use log::{warn, LevelFilter};
+use std::fs::DirBuilder;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::SystemTray;
@@ -23,7 +24,6 @@ mod tests;
 const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::Webview];
 #[cfg(debug_assertions)]
 const LOG_LEVEL: LevelFilter = LevelFilter::Debug;
-
 
 #[cfg(not(debug_assertions))]
 const LOG_LEVEL: LevelFilter = LevelFilter::Warn;
@@ -52,6 +52,11 @@ fn main() {
                     PathBuf::from("./")
                 },
                 |dir| {
+                    if !dir.exists() {
+                        DirBuilder::new()
+                            .create(&dir)
+                            .expect("could not create app cache directory");
+                    }
                     let pattern = format!("{}/.ssh-connection*", dir.display());
                     commands::cleanup_entities_by_pattern(&pattern)
                         .expect("could not cleanup_connections");
