@@ -19,6 +19,14 @@ pub async fn assert_client_directory_on_server(client: &Sftp, path: &Path) -> Re
 
 pub fn backup_to_server(backup: &Backup, config: &Config) -> Result<(), Error> {
     let connection_string = format!(
+        "{}@{}:{}",
+        config.username,
+        config.server_address.replace("http://", ""),
+        backup.server_location.path
+    );
+
+    #[cfg(target_os = "macos")]
+    let connection_string = format!(
         "{}@{}:'{}'",
         config.username,
         config.server_address.replace("http://", ""),
