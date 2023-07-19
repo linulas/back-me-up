@@ -142,7 +142,6 @@
 			console.error(e);
 			error = { message: "Couldn't read config files" };
 		}
-		checkForUpdate();
 	});
 
 	onDestroy(async () => {
