@@ -10,6 +10,8 @@ import type { Redirect } from '@sveltejs/kit';
 import type { Folder } from '../../src-tauri/bindings/Folder';
 import type { Config } from '../../src-tauri/bindings/Config';
 import { goto } from '$app/navigation';
+import { missingKeys, type Field } from '$lib/validate';
+import type { Backup } from '../../src-tauri/bindings/Backup';
 
 export const isRedirect = (someError: any): someError is Redirect => someError?.status === 302;
 
@@ -86,6 +88,31 @@ const appDataDirectoryExists = async () => {
 	}
 };
 
+/**
+ * This function will check if the backups array has the given fields.
+ * If it doesn't, it will add the missing fields with the default value.
+ *
+ * @param backups The array of backups to check
+ * @param fields Ensure these fields on each backup
+ */
+const assertBackupsHasFields = (backups: Backup[], fields: Field[]) => {
+	backups.map((backup) => {
+		let missing = missingKeys(backup, fields);
+
+		if (missing.length > 0) {
+			missing.map((field) => {
+				backup[field.name as keyof Backup] = field.defaultValue;
+			});
+		}
+	});
+
+	writeTextFile(BACKUPS_FILE_NAME, JSON.stringify(backups), { dir: BaseDirectory.AppData }).catch(
+		(e) => logError(JSON.stringify(e))
+	);
+
+	return backups;
+};
+
 export const loadStoredBackupsAndSetToState = async () => {
 	const options = { dir: BaseDirectory.AppData };
 	try {
@@ -93,7 +120,13 @@ export const loadStoredBackupsAndSetToState = async () => {
 			writeTextFile(BACKUPS_FILE_NAME, JSON.stringify([]), options);
 		}
 
-		backups.set(JSON.parse(await readTextFile(BACKUPS_FILE_NAME, options)));
+		// NOTE: Use assertBackupsHasFields to ensure backwards compatibility when adding new fields to the backup model
+		const storedBackups = assertBackupsHasFields(
+			JSON.parse(await readTextFile(BACKUPS_FILE_NAME, options)),
+			[{ name: 'options', defaultValue: null }] // Add values here if needed
+		);
+
+		backups.set(storedBackups);
 	} catch (e) {
 		logError(JSON.stringify(e));
 	}

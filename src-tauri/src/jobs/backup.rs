@@ -130,6 +130,7 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
                 ),
             },
             latest_run: None,
+            options: job.backup.options.clone(),
         };
 
         info!("Deleting {}", backup_realtive_to_root.server_location.path);
@@ -208,6 +209,7 @@ pub fn exec_backup_command(
             entity_name: job.backup.server_location.entity_name.clone(),
         },
         latest_run: None,
+        options: job.backup.options.clone(),
     };
 
     // TODO: make type for FILE
