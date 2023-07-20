@@ -12,3 +12,15 @@ export const isIp = (str: string): boolean => {
 export const isNumber = (value: any): boolean => {
 	return typeof value === 'number' && isFinite(value);
 };
+
+export type Field = { name: string; defaultValue: any };
+export const missingKeys = (obj: object, fields: Field[]): Field[] => {
+	const missingKeys: Field[] = [];
+	for (const field of fields) {
+		if (!(field.name in obj)) {
+			missingKeys.push(field);
+		}
+	}
+
+	return missingKeys;
+};
