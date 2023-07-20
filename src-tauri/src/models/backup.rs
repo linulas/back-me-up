@@ -10,8 +10,15 @@ pub struct Location {
 
 #[derive(TS, Deserialize, Clone)]
 #[ts(export)]
+pub struct Options {
+    pub use_client_directory: bool,
+}
+
+#[derive(TS, Deserialize, Clone)]
+#[ts(export)]
 pub struct Backup {
     pub client_location: Location,
     pub server_location: Location,
     pub latest_run: Option<u64>,
+    pub options: Option<Options>,
 }

@@ -15,14 +15,13 @@
 	import Modal from '$lib/modal.svelte';
 	import { sleep } from '$lib/concurrency';
 	import { emit, listen } from '@tauri-apps/api/event';
-	import { checkForUpdate } from '$lib/update';
 	import { onUpdaterEvent } from '@tauri-apps/api/updater';
+	import { info, error as logError } from 'tauri-plugin-log-api';
 
 	import type { Folder } from '../../src-tauri/bindings/Folder';
 	import type { Backup } from '../../src-tauri/bindings/Backup';
 	import type { Config } from '../../src-tauri/bindings/Config';
 	import type { JobStatus } from '../../src-tauri/bindings/JobStatus';
-	import { info, error as logError } from 'tauri-plugin-log-api';
 
 	let server_home_folders: Folder[] = [];
 	let new_folder_to_backup: Folder | undefined;
@@ -30,6 +29,7 @@
 	let button_states: { [key: string]: ButtonState } = {};
 	let error: App.Error | undefined;
 	let initError: App.Error | undefined;
+  let use_client_directory = false;
 
 	$: selectItems = server_home_folders.map((folder) => ({
 		title: folder.name,
@@ -137,11 +137,15 @@
 				path: new_folder_to_backup!.path
 			},
 			server_location: { entity_name: server_folder.name, path: server_folder.path },
-			latest_run: null
+			latest_run: null,
+			options: {
+				use_client_directory
+			}
 		};
 
 		new_folder_to_backup = undefined;
 		target_server_folder = undefined;
+    use_client_directory = false;
 
 		backups.update((currentState) => [...currentState, backup]);
 		emit('backups-updated', $backups);
@@ -217,6 +221,15 @@
 				<div class="form_group">
 					<label for="server_home_folders">Select target folder on the server</label>
 					<Select items={selectItems} bind:value={target_server_folder} />
+				</div>
+				<div class="form_group">
+					<label for="use_client_directory">Use client directory on server</label>
+					<input
+						id="use_client_directory"
+						type="checkbox"
+						checked={use_client_directory}
+						on:change={() => (use_client_directory = !use_client_directory)}
+					/>
 				</div>
 				<Button type="secondary" onClick={addNewBackup}>Backup</Button>
 			</div>

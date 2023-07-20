@@ -18,6 +18,7 @@ pub async fn assert_client_directory_on_server(client: &Sftp, path: &Path) -> Re
 }
 
 pub fn backup_to_server(backup: &Backup, config: &Config) -> Result<(), Error> {
+    #[allow(unused_variables)]
     let connection_string = format!(
         "{}@{}:{}",
         config.username,
@@ -26,6 +27,7 @@ pub fn backup_to_server(backup: &Backup, config: &Config) -> Result<(), Error> {
     );
 
     #[cfg(target_os = "macos")]
+    #[allow(unused_variables)]
     let connection_string = format!(
         "{}@{}:'{}'",
         config.username,
@@ -33,12 +35,23 @@ pub fn backup_to_server(backup: &Backup, config: &Config) -> Result<(), Error> {
         backup.server_location.path
     );
 
+    let client_directory = backup.options.as_ref().map_or_else(
+        || backup.client_location.path.clone(),
+        |options| {
+            if options.use_client_directory {
+                backup.client_location.path.clone()
+            } else {
+                format!("{}/", backup.client_location.path.clone())
+            }
+        },
+    );
+
     let rsync = Command::new("rsync")
         .arg("-a")
         .arg("-e")
         .arg(format!("ssh -p {}", config.server_port))
         .arg("--exclude=.*")
-        .arg(&backup.client_location.path)
+        .arg(&client_directory)
         .arg(&connection_string)
         .output()?;
 
