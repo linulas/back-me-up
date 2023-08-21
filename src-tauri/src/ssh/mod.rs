@@ -1,3 +1,4 @@
+use crate::models::app;
 use serde::Serialize;
 
 pub mod commands;
@@ -5,9 +6,16 @@ pub mod connect;
 
 #[derive(Debug)]
 pub enum Error {
+    App(app::Error),
     Connection(openssh::Error),
     Sftp(openssh_sftp_client::Error),
-    Command(String)
+    Command(String),
+}
+
+impl From<app::Error> for Error {
+    fn from(e: app::Error) -> Self {
+        Self::App(e)
+    }
 }
 
 impl From<openssh::Error> for Error {
@@ -36,4 +44,3 @@ impl Serialize for Error {
         format!("{self:?}").serialize(serializer)
     }
 }
-

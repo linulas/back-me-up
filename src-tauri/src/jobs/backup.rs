@@ -1,5 +1,5 @@
-use super::{Arguments, Pool, ThreadAction};
-use crate::models::app::{self, Config};
+use super::{id_from_backup, Arguments, Error, Kind, Pool, ThreadAction};
+use crate::models::app::{self, Config, MutexState};
 use crate::models::backup::{Backup, Location};
 use crate::ssh;
 use chrono::{DateTime, Local};
@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::io;
 use std::path::Path;
 use std::process::Command;
-use std::sync::MutexGuard;
+use std::sync::{Arc, MutexGuard};
 
 pub struct WatchDirectory {
     backup: Backup,
@@ -285,4 +285,66 @@ pub fn terminate_all(jobs: &mut MutexGuard<HashMap<String, usize>>, pool: &mut M
     });
 
     jobs.clear();
+}
+
+pub async fn backup_entity(mut backup: Backup, state: Arc<&MutexState>) -> Result<String, Error> {
+    let config = match state.config.lock()?.as_ref() {
+        Some(config) => config.clone(),
+        None => return Err(Error::App(app::Error::Config(String::from("No config")))),
+    };
+    let folder_to_assert = format!(
+        "./{}/{}",
+        backup.server_location.entity_name, config.client_name
+    );
+
+    let connection = state.connection.lock().await;
+    let client = match connection.as_ref() {
+        Some(connection) => Arc::new(&connection.sftp_client),
+        None => {
+            return Err(Error::App(app::Error::MissingConnection(String::from(
+                "No connection",
+            ))));
+        }
+    };
+    let config = match state.config.lock()?.as_ref() {
+        Some(config) => config.clone(),
+        None => return Err(Error::App(app::Error::Config(String::from("No config")))),
+    };
+
+    let path = Path::new(&folder_to_assert);
+    ssh::commands::assert_client_directory_on_server(&client, path).await?;
+
+    let mut pool = state.pool.lock()?;
+    let jobs = Arc::clone(&state.jobs);
+    let failed_jobs = Arc::clone(&state.failed_jobs);
+
+    // prepend client_name as a root folder on the server for the backup
+    backup.server_location.path = format!("{}/{}", backup.server_location.path, config.client_name);
+    let job_id_for_client = id_from_backup(&backup, &Kind::Backup);
+    if failed_jobs.lock()?.contains_key(&job_id_for_client) {
+        failed_jobs.lock()?.remove(&job_id_for_client);
+    }
+
+    pool.execute(move |worker| {
+        let job_id = id_from_backup(&backup, &Kind::Backup);
+        jobs.lock()
+            .expect("Could not lock jobs")
+            .insert(job_id.clone(), worker.id);
+
+        match ssh::commands::backup_to_server(&backup, &config) {
+            Ok(_) => {
+                jobs.lock().expect("Could not lock jobs").remove(&job_id);
+            }
+            Err(e) => {
+                error!("{e:?}");
+                jobs.lock().expect("Could not lock jobs").remove(&job_id);
+                failed_jobs
+                    .lock()
+                    .expect("Could not lock failed jobs")
+                    .insert(job_id, worker.id);
+            }
+        };
+    })?;
+
+    Ok(job_id_for_client)
 }

@@ -1,5 +1,6 @@
-use crate::models::app;
+use crate::models::app::{self, Config};
 use crate::models::backup::Backup;
+use crate::ssh;
 use log::{info, warn};
 use serde::Serialize;
 use ts_rs::TS;
@@ -21,13 +22,32 @@ pub type Failed = HashMap<Id, WorkerId>;
 #[derive(Debug, Serialize)]
 pub enum Error {
     App(app::Error),
+    Ssh(ssh::Error),
     NotFound(String),
     Send(String),
     Terminate(String),
 }
 
+impl From<ssh::Error> for Error {
+    fn from(e: ssh::Error) -> Self {
+        Self::Ssh(e)
+    }
+}
+
 impl From<PoisonError<MutexGuard<'_, HashMap<String, usize>>>> for Error {
     fn from(e: PoisonError<MutexGuard<HashMap<String, usize>>>) -> Self {
+        Self::App(app::Error::from(e))
+    }
+}
+
+impl From<PoisonError<MutexGuard<'_, Option<Config>>>> for Error {
+    fn from(e: PoisonError<MutexGuard<Option<Config>>>) -> Self {
+        Self::App(app::Error::from(e))
+    }
+}
+
+impl From<PoisonError<MutexGuard<'_, Pool>>> for Error {
+    fn from(e: PoisonError<MutexGuard<Pool>>) -> Self {
         Self::App(app::Error::from(e))
     }
 }

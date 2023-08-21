@@ -1,10 +1,14 @@
 use super::Error;
 use crate::models::app::Config;
 use crate::models::backup::Backup;
+use crate::models::storage::{Folder, Size};
+use futures::TryStreamExt;
 use log::info;
 use openssh_sftp_client::Sftp;
+use openssh_sftp_client::fs::DirEntry;
 use std::path::Path;
 use std::process::Command;
+use std::sync::Arc;
 
 pub async fn assert_client_directory_on_server(client: &Sftp, path: &Path) -> Result<(), Error> {
     match client.open(&path).await {
@@ -95,4 +99,42 @@ pub fn delete_from_server(backup: &Backup, config: &Config) -> Result<(), Error>
         let why = format!("{stdout}\n{stderr}");
         Err(Error::Command(format!("SSH delete command failed: {why}")))
     }
+}
+
+pub async fn list_home_folders(client: Arc<&Sftp>, user: String) -> Result<Vec<Folder>, Error> {
+    let home_dir = client.fs().open_dir(Path::new("./")).await?;
+    let entries: Vec<DirEntry> = home_dir.read_dir().try_collect().await?;
+    let mut folders: Vec<Folder> = Vec::new();
+
+    for entry in entries {
+        let is_dir = match entry.file_type() {
+            Some(file_type) => file_type.is_dir(),
+            None => {
+                continue;
+            }
+        };
+
+        if !is_dir {
+            continue;
+        }
+
+        let name = match entry.filename().to_str() {
+            Some(name) => name.to_string(),
+            None => continue,
+        };
+
+        if name.starts_with('.') {
+            continue;
+        }
+
+        let path = format!("/home/{user}/{name}");
+
+        folders.push(Folder {
+            name,
+            path,
+            size: Some(Size::B(entry.metadata().len().unwrap_or_default())),
+        });
+    }
+
+    Ok(folders)
 }

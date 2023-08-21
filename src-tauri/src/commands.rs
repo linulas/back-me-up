@@ -1,16 +1,14 @@
 use crate::jobs::{self, Pool};
 use crate::models::app::{self, Config};
 use crate::models::backup::Backup;
-use crate::models::storage::{Folder, Size};
+use crate::models::storage::Folder;
 use crate::ssh::{self, connect::Connection};
-use futures::TryStreamExt;
 use glob::{glob, PatternError};
 use log::{debug, error, info};
-use openssh_sftp_client::fs::DirEntry;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::{Arc, MutexGuard, PoisonError};
 use tauri::State;
@@ -100,58 +98,16 @@ pub async fn list_home_folders(state: State<'_, app::MutexState>) -> Result<Vec<
         }
     };
 
-    let home_dir = client.fs().open_dir(Path::new("./")).await?;
-    let entries: Vec<DirEntry> = home_dir.read_dir().try_collect().await?;
-    let mut folders: Vec<Folder> = Vec::new();
+    let config = match state.config.lock()?.as_ref() {
+        Some(config) => config.clone(),
+        None => return Err(Error::App(app::Error::Config(String::from("No config")))),
+    };
 
-    for entry in entries {
-        let is_dir = match entry.file_type() {
-            Some(file_type) => file_type.is_dir(),
-            None => {
-                continue;
-            }
-        };
+    let username = config.username.clone();
+    let client = Arc::clone(&Arc::new(client));
+    let result = ssh::commands::list_home_folders(client, username).await?;
 
-        if !is_dir {
-            continue;
-        }
-
-        let name = match entry.filename().to_str() {
-            Some(name) => name.to_string(),
-            None => continue,
-        };
-
-        if name.starts_with('.') {
-            continue;
-        }
-
-        let mutex_guard = match state.config.lock() {
-            Ok(guard) => guard,
-            Err(e) => {
-                error!("Could not get config: {e}");
-                continue;
-            }
-        };
-
-        let config = if let Some(config) = mutex_guard.as_ref() {
-            config
-        } else {
-            error!("config was empty");
-            continue;
-        };
-
-        let user = &config.username;
-
-        let path = format!("/home/{user}/{name}");
-
-        folders.push(Folder {
-            name,
-            path,
-            size: Some(Size::B(entry.metadata().len().unwrap_or_default())),
-        });
-    }
-
-    Ok(folders)
+    Ok(result)
 }
 
 #[tauri::command]
@@ -184,67 +140,10 @@ pub fn set_config(config: Config, state: State<'_, app::MutexState>) -> Result<(
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub async fn backup_entity(
-    mut backup: Backup,
+    backup: Backup,
     state: State<'_, app::MutexState>,
 ) -> Result<String, Error> {
-    let connection = state.connection.lock().await;
-
-    let client = match &connection.as_ref() {
-        Some(connection) => &connection.sftp_client,
-        None => {
-            let error = app::Error::MissingConnection(String::from("No connection"));
-            return Err(Error::App(error));
-        }
-    };
-
-    let config = if let Some(config) = state.config.lock()?.as_ref() {
-        config.clone()
-    } else {
-        let error = app::Error::Config(String::from("No config detected"));
-        return Err(Error::App(error));
-    };
-
-    let folder_to_assert = format!(
-        "./{}/{}",
-        backup.server_location.entity_name, config.client_name
-    );
-
-    let path = Path::new(&folder_to_assert);
-    ssh::commands::assert_client_directory_on_server(client, path).await?;
-
-    let mut pool = state.pool.lock()?;
-    let jobs = Arc::clone(&state.jobs);
-    let failed_jobs = Arc::clone(&state.failed_jobs);
-
-    // prepend client_name as a root folder on the server for the backup
-    backup.server_location.path = format!("{}/{}", backup.server_location.path, config.client_name);
-    let job_id_for_client = jobs::id_from_backup(&backup, &jobs::Kind::Backup);
-    if state.failed_jobs.lock()?.contains_key(&job_id_for_client) {
-        state.failed_jobs.lock()?.remove(&job_id_for_client);
-    }
-
-    pool.execute(move |worker| {
-        let job_id = jobs::id_from_backup(&backup, &jobs::Kind::Backup);
-        jobs.lock()
-            .expect("Could not lock jobs")
-            .insert(job_id.clone(), worker.id);
-
-        match ssh::commands::backup_to_server(&backup, &config) {
-            Ok(_) => {
-                jobs.lock().expect("Could not lock jobs").remove(&job_id);
-            }
-            Err(e) => {
-                error!("{e:?}");
-                jobs.lock().expect("Could not lock jobs").remove(&job_id);
-                failed_jobs
-                    .lock()
-                    .expect("Could not lock failed jobs")
-                    .insert(job_id, worker.id);
-            }
-        };
-    })?;
-
-    Ok(job_id_for_client)
+    Ok(jobs::backup::backup_entity(backup, Arc::new(state.inner())).await?)
 }
 
 #[tauri::command]
