@@ -1,3 +1,5 @@
+mod menu;
+
 fn main() {
-    println!("Hello, world!");
+    menu::show();
 }
