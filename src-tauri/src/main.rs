@@ -1,6 +1,6 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use self::models::app::MutexState;
+use bmu::{jobs, models::app::MutexState};
 use log::{warn, LevelFilter};
 use std::fs::DirBuilder;
 use std::path::PathBuf;
@@ -12,13 +12,7 @@ use tauri_plugin_log::LogTarget;
 
 mod commands;
 mod event;
-mod jobs;
-mod models;
-mod ssh;
 mod tray;
-
-#[cfg(test)]
-mod tests;
 
 #[cfg(debug_assertions)]
 const LOG_TARGETS: [LogTarget; 2] = [LogTarget::Stdout, LogTarget::Webview];

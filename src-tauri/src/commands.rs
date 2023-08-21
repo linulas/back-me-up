@@ -1,8 +1,8 @@
 use crate::jobs::{self, Pool};
-use crate::models::app::{self, Config};
-use crate::models::backup::Backup;
-use crate::models::storage::Folder;
-use crate::ssh::{self, connect::Connection};
+use bmu::models::app::{self, Config};
+use bmu::models::backup::Backup;
+use bmu::models::storage::Folder;
+use bmu::ssh::{self, connect::Connection};
 use glob::{glob, PatternError};
 use log::{debug, error, info};
 use serde::Serialize;
