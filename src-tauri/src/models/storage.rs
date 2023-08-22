@@ -49,6 +49,12 @@ pub struct Folder {
     pub size: Option<Size>,
 }
 
+impl Display for Folder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{0}", self.name)
+    }
+}
+
 #[derive(TS, Debug, Serialize, Deserialize, Clone)]
 #[ts(export)]
 pub struct File {
