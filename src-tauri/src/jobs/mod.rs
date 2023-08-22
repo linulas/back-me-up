@@ -1,13 +1,13 @@
 use crate::models::app::{self, Config};
 use crate::models::backup::Backup;
 use crate::ssh;
-use log::{info, warn};
+use log::{error, info, warn};
 use serde::Serialize;
-use ts_rs::TS;
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, SendError, Sender};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
+use ts_rs::TS;
 
 const IS_AVAILABLE_SHOULD_LOCK: &str = "could not lock field 'is_available'";
 
@@ -72,9 +72,12 @@ pub enum Kind {
     Backup,
 }
 
-
 #[derive(TS, Serialize)]
-#[ts(export, export_to = "../../bindings/JobStatus.ts", rename = "JobStatus")]
+#[ts(
+    export,
+    export_to = "../../bindings/JobStatus.ts",
+    rename = "JobStatus"
+)]
 pub enum Status {
     Running,
     Failed,
@@ -343,7 +346,7 @@ pub fn id_from_backup(backup: &Backup, kind: &Kind) -> String {
                 "{}_{}_backup",
                 backup.client_location.path, backup.server_location.path
             )
-        },
+        }
         Kind::BackupOnChange => {
             format!(
                 "{}_{}_backup_on_change",
@@ -351,4 +354,20 @@ pub fn id_from_backup(backup: &Backup, kind: &Kind) -> String {
             )
         }
     }
+}
+
+pub fn check_status(
+    id: String,
+    running_jobs: &Arc<Mutex<Active>>,
+    failed_jobs: &Arc<Mutex<Failed>>,
+) -> Result<Status, Error> {
+    if failed_jobs.lock()?.contains_key(&id) {
+        error!("{id}: failed");
+        return Ok(Status::Failed);
+    } else if running_jobs.lock()?.contains_key(&id) {
+        return Ok(Status::Running);
+    }
+
+    info!("{id}: completed");
+    Ok(Status::Completed)
 }

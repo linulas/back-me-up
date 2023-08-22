@@ -362,13 +362,5 @@ pub fn check_job_status(
     state: State<'_, app::MutexState>,
     id: String,
 ) -> Result<jobs::Status, Error> {
-    if state.failed_jobs.lock()?.contains_key(&id) {
-        error!("{id}: failed");
-        return Ok(jobs::Status::Failed);
-    } else if state.jobs.lock()?.contains_key(&id) {
-        return Ok(jobs::Status::Running);
-    }
-
-    info!("{id}: completed");
-    Ok(jobs::Status::Completed)
+    Ok(jobs::check_status(id, &state.jobs, &state.failed_jobs)?)
 }
