@@ -52,7 +52,7 @@ fn main() {
                             .expect("could not create app cache directory");
                     }
                     let pattern = format!("{}/.ssh-connection*", dir.display());
-                    commands::cleanup_entities_by_pattern(&pattern)
+                    jobs::fs::cleanup_entities_by_pattern(&pattern)
                         .expect("could not cleanup_connections");
                     dir
                 },

@@ -1,4 +1,3 @@
-use crate::commands;
 use log::error;
 use log::warn;
 use tauri::AppHandle;
@@ -53,7 +52,7 @@ pub fn handle_system_tray_event(app: &AppHandle, event: SystemTrayEvent) {
                     },
                     |app_cache_dir| {
                         let pattern = format!("{}/.ssh-connection*", app_cache_dir.display());
-                        commands::cleanup_entities_by_pattern(&pattern)
+                        bmu::jobs::fs::cleanup_entities_by_pattern(&pattern)
                             .expect("could not cleanup_connections");
                     },
                 );

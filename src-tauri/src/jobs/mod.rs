@@ -12,6 +12,7 @@ use std::thread;
 const IS_AVAILABLE_SHOULD_LOCK: &str = "could not lock field 'is_available'";
 
 pub mod backup;
+pub mod fs;
 
 pub type Id = String;
 pub type WorkerId = usize;
@@ -26,6 +27,8 @@ pub enum Error {
     NotFound(String),
     Send(String),
     Terminate(String),
+    Pattern(String),
+    Command(String),
 }
 
 impl From<ssh::Error> for Error {

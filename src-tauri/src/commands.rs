@@ -3,11 +3,9 @@ use bmu::models::app::{self, Config};
 use bmu::models::backup::Backup;
 use bmu::models::storage::Folder;
 use bmu::ssh::{self, connect::Connection};
-use glob::{glob, PatternError};
 use log::{debug, error, info};
 use serde::Serialize;
 use std::collections::HashMap;
-use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::{Arc, MutexGuard, PoisonError};
@@ -65,12 +63,6 @@ impl From<PoisonError<MutexGuard<'_, HashMap<String, usize>>>> for Error {
 
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
-        Self::Command(e.to_string())
-    }
-}
-
-impl From<PatternError> for Error {
-    fn from(e: PatternError) -> Self {
         Self::Command(e.to_string())
     }
 }
@@ -379,17 +371,4 @@ pub fn check_job_status(
 
     info!("{id}: completed");
     Ok(jobs::Status::Completed)
-}
-
-pub fn cleanup_entities_by_pattern(pattern: &str) -> Result<(), Error> {
-    for path in (glob(pattern)?).flatten() {
-        if path.is_file() {
-            fs::remove_file(path)?;
-        } else if path.is_dir() {
-            fs::remove_dir_all(path)?;
-        }
-    }
-
-    info!("cleanup successfull!");
-    Ok(())
 }
