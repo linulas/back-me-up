@@ -38,7 +38,7 @@ impl From<PoisonError<MutexGuard<'_, PathBuf>>> for Error {
     }
 }
 
-#[derive(TS, Deserialize, Clone, Debug)]
+#[derive(TS, Serialize, Deserialize, Clone, Debug)]
 #[ts(export)]
 pub struct Config {
     pub client_name: String,
