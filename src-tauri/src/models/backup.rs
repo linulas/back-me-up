@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -21,4 +23,14 @@ pub struct Backup {
     pub server_location: Location,
     pub latest_run: Option<u64>,
     pub options: Option<Options>,
+}
+
+impl Display for Backup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} -> {}",
+            self.client_location.path, self.server_location.path
+        )
+    }
 }
