@@ -75,6 +75,42 @@ impl Display for StartMenuItem {
     }
 }
 
+pub async fn run_backup(state: &MutexState, backup: Backup) -> Result<(), Error> {
+    let id = jobs::backup::backup_entity(backup.clone(), Arc::new(state)).await?;
+    print!("\r⏳ Backing up: {id}");
+    io::stdout().flush().expect("failed to flush stdout");
+    thread::sleep(std::time::Duration::from_secs(1));
+    while let jobs::Status::Running =
+        jobs::check_status(id.clone(), &state.jobs, &state.failed_jobs)?
+    {
+        thread::sleep(std::time::Duration::from_millis(500));
+    }
+    println!("\x1B[1A\x1B[2K");
+    io::stdout().flush().expect("failed to flush stdout");
+
+    if let jobs::Status::Failed = jobs::check_status(id.clone(), &state.jobs, &state.failed_jobs)? {
+        print!("\r{}", format!("{}", " ".repeat(100))); // removes the loading indicator
+        return Err(Error::Job(jobs::Error::Failed(format!(
+            "Something went wrong when backing up {}",
+            backup.client_location.path
+        ))));
+    }
+
+    println!("✅ Backup successfull {}\n", " ".repeat(100));
+    Ok(())
+}
+
+pub async fn select_backup(state: &MutexState) -> Result<(), Error> {
+    let storage = storage::Storage::load()?;
+    let backups = storage.backups()?;
+
+    let backup: Backup = Select::new("Select a backup", backups)
+        .with_vim_mode(true)
+        .prompt()?;
+
+    Ok(run_backup(state, backup).await?)
+}
+
 async fn add_backup(state: &MutexState) -> Result<(), Error> {
     let backup = Backup {
         client_location: get_client_location()?,
@@ -92,25 +128,7 @@ async fn add_backup(state: &MutexState) -> Result<(), Error> {
     storage.add_backup(backup.clone())?;
     println!("Backup added to storage");
 
-    let result = jobs::backup::backup_entity(backup, Arc::new(state)).await;
-
-    match result {
-        Err(why) => Err(Error::from(why)),
-        Ok(id) => {
-            print!("\r⏳ Backing up: {id}");
-            io::stdout().flush().expect("failed to flush stdout");
-            thread::sleep(std::time::Duration::from_secs(1));
-            while let jobs::Status::Running =
-                jobs::check_status(id.clone(), &state.jobs, &state.failed_jobs)?
-            {
-                thread::sleep(std::time::Duration::from_millis(500));
-            }
-            println!("\x1B[1A\x1B[2K");
-            io::stdout().flush().expect("failed to flush stdout");
-            println!("✅ Backup successfull {}\n", " ".repeat(100));
-            Ok(())
-        }
-    }
+    Ok(run_backup(state, backup).await?)
 }
 
 async fn get_server_location(state: &MutexState) -> Result<Location, Error> {
@@ -195,7 +213,7 @@ fn get_client_location() -> Result<Location, Error> {
 async fn handle_menu_option(option: StartMenuItem, state: &MutexState) -> Result<(), Error> {
     match option {
         StartMenuItem::AddBackup(_) => add_backup(state).await?,
-        StartMenuItem::RunBackup(_) => unimplemented!(),
+        StartMenuItem::RunBackup(_) => select_backup(state).await?,
         StartMenuItem::Exit(_) => process::exit(0),
     };
 
