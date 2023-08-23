@@ -63,14 +63,14 @@ pub async fn handle(state: &MutexState) -> Result<Action, Error> {
 
     match option {
         BackupMenuItem::Run(_) => run(state, backup).await?,
-        BackupMenuItem::Delete(_) => todo!(),
+        BackupMenuItem::Delete(_) => delete(backup).await?,
         BackupMenuItem::Back(_) => return Ok(Action::Show),
     };
 
     Ok(Action::Show)
 }
 
-pub async fn run(state: &MutexState, backup: Backup) -> Result<(), Error> {
+async fn run(state: &MutexState, backup: Backup) -> Result<(), Error> {
     let id = jobs::backup::backup_entity(backup.clone(), Arc::new(state)).await?;
     print!("\r⏳ Backing up: {id}");
     io::stdout().flush().expect("failed to flush stdout");
@@ -130,6 +130,11 @@ pub async fn add(state: &MutexState) -> Result<(), Error> {
     println!("Backup added to storage");
 
     Ok(run(state, backup).await?)
+}
+
+async fn delete(backup: Backup) -> Result<(), Error> {
+    let storage = storage::Storage::load()?;
+    Ok(storage.delete_backup(backup)?)
 }
 
 async fn get_server_location(state: &MutexState) -> Result<Location, Error> {

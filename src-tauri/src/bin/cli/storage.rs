@@ -113,6 +113,17 @@ impl Storage {
         Ok(())
     }
 
+    pub fn delete_backup(&self, backup: Backup) -> Result<(), Error> {
+        let mut backups = self.backups()?;
+        backups.retain(|b| {
+            b.client_location.path != backup.client_location.path
+                || b.server_location.path != backup.server_location.path
+        });
+        self.write_backups(backups);
+
+        Ok(())
+    }
+
     fn write_backups(&self, backups: Vec<Backup>) {
         let backup_file_path = self.data_dir.join("backups.json");
         let backup_file_contents =
