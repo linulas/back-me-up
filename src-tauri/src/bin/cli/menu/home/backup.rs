@@ -1,81 +1,17 @@
+use super::Error;
 use crate::storage;
-use bmu::models::app::{Config, MutexState};
+use bmu::jobs;
+use bmu::models::app::MutexState;
 use bmu::models::backup::{Backup, Location};
 use bmu::models::storage::Folder;
 use bmu::ssh::commands::list_home_folders;
-use bmu::{jobs, ssh};
-use inquire::{error::InquireError, Select};
-use std::fmt::Display;
-use std::io::{self, Write};
+use inquire::{InquireError, Select};
+use std::io::Write;
 use std::path::PathBuf;
-use std::sync::{Arc, MutexGuard, PoisonError};
-use std::{process, thread};
+use std::sync::Arc;
+use std::{io, thread};
 
-type StartMenuItemText = String;
-
-#[derive(Debug)]
-pub enum Error {
-    Inquire(InquireError),
-    Io(io::Error),
-    Path(String),
-    SSH(ssh::Error),
-    State(String),
-    Job(jobs::Error),
-    Storage(storage::Error),
-}
-
-impl From<storage::Error> for Error {
-    fn from(e: storage::Error) -> Self {
-        Self::Storage(e)
-    }
-}
-
-impl From<jobs::Error> for Error {
-    fn from(e: jobs::Error) -> Self {
-        Self::Job(e)
-    }
-}
-
-impl From<PoisonError<MutexGuard<'_, Option<Config>>>> for Error {
-    fn from(e: PoisonError<MutexGuard<Option<Config>>>) -> Self {
-        Self::State(e.to_string())
-    }
-}
-
-impl From<ssh::Error> for Error {
-    fn from(err: ssh::Error) -> Self {
-        Self::SSH(err)
-    }
-}
-
-impl From<InquireError> for Error {
-    fn from(err: InquireError) -> Self {
-        Self::Inquire(err)
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Self {
-        Self::Io(err)
-    }
-}
-
-enum StartMenuItem {
-    AddBackup(StartMenuItemText),
-    RunBackup(StartMenuItemText),
-    Exit(StartMenuItemText),
-}
-
-impl Display for StartMenuItem {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let text = match self {
-            Self::AddBackup(value) | Self::RunBackup(value) | Self::Exit(value) => value,
-        };
-        write!(f, "{text}")
-    }
-}
-
-pub async fn run_backup(state: &MutexState, backup: Backup) -> Result<(), Error> {
+pub async fn run(state: &MutexState, backup: Backup) -> Result<(), Error> {
     let id = jobs::backup::backup_entity(backup.clone(), Arc::new(state)).await?;
     print!("\r⏳ Backing up: {id}");
     io::stdout().flush().expect("failed to flush stdout");
@@ -100,7 +36,7 @@ pub async fn run_backup(state: &MutexState, backup: Backup) -> Result<(), Error>
     Ok(())
 }
 
-pub async fn select_backup(state: &MutexState) -> Result<(), Error> {
+pub async fn select(state: &MutexState) -> Result<(), Error> {
     let storage = storage::Storage::load()?;
     let backups = storage.backups()?;
 
@@ -108,10 +44,10 @@ pub async fn select_backup(state: &MutexState) -> Result<(), Error> {
         .with_vim_mode(true)
         .prompt()?;
 
-    Ok(run_backup(state, backup).await?)
+    Ok(run(state, backup).await?)
 }
 
-async fn add_backup(state: &MutexState) -> Result<(), Error> {
+pub async fn add(state: &MutexState) -> Result<(), Error> {
     let backup = Backup {
         client_location: get_client_location()?,
         server_location: get_server_location(state).await?,
@@ -128,7 +64,7 @@ async fn add_backup(state: &MutexState) -> Result<(), Error> {
     storage.add_backup(backup.clone())?;
     println!("Backup added to storage");
 
-    Ok(run_backup(state, backup).await?)
+    Ok(run(state, backup).await?)
 }
 
 async fn get_server_location(state: &MutexState) -> Result<Location, Error> {
@@ -208,32 +144,4 @@ fn get_client_location() -> Result<Location, Error> {
     }
 
     Err(Error::Path(String::from("Could not parse path")))
-}
-
-async fn handle_menu_option(option: StartMenuItem, state: &MutexState) -> Result<(), Error> {
-    match option {
-        StartMenuItem::AddBackup(_) => add_backup(state).await?,
-        StartMenuItem::RunBackup(_) => select_backup(state).await?,
-        StartMenuItem::Exit(_) => process::exit(0),
-    };
-
-    Ok(())
-}
-
-pub async fn show(state: &MutexState) -> Result<(), Error> {
-    let options = vec![
-        StartMenuItem::AddBackup(String::from("Add backup")),
-        StartMenuItem::RunBackup(String::from("Run backup")),
-        StartMenuItem::Exit(String::from("Exit")),
-    ];
-    let prompt_result: Result<StartMenuItem, InquireError> = Select::new("Select option", options)
-        .with_vim_mode(true)
-        .prompt();
-
-    match prompt_result {
-        Ok(option) => handle_menu_option(option, state).await?,
-        Err(err) => println!("\n⛔️ Error selecting option: {err}"),
-    };
-
-    Ok(())
 }
