@@ -29,6 +29,7 @@ pub enum Error {
     Terminate(String),
     Pattern(String),
     Command(String),
+    Failed(String),
 }
 
 impl From<ssh::Error> for Error {
