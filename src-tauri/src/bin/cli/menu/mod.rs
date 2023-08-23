@@ -6,6 +6,11 @@ use std::sync::{Arc, Mutex};
 mod home;
 pub mod ui;
 
+pub enum Action {
+    Show,
+    Exit,
+}
+
 pub async fn show() {
     let storage = match storage::Storage::load() {
         Ok(s) => s,
