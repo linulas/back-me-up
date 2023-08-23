@@ -9,6 +9,13 @@ pub enum Error {
     NotUnique(String),
     Env(env::VarError),
     Io(std::io::Error),
+    Json(serde_json::Error),
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Self {
+        Self::Json(err)
+    }
 }
 
 impl From<env::VarError> for Error {
@@ -81,20 +88,19 @@ impl Storage {
     //         .expect("Failed to write config file");
     // }
 
-    pub fn backups(&self) -> Vec<Backup> {
+    pub fn backups(&self) -> Result<Vec<Backup>, Error> {
         if !self.data_dir.join("backups.json").exists() {
-            return vec![];
+            return Ok(vec![]);
         }
 
         let backup_file_path = self.data_dir.join("backups.json");
-        let backup_file_contents =
-            std::fs::read_to_string(&backup_file_path).expect("Failed to read backup file");
+        let backup_file_contents = std::fs::read_to_string(&backup_file_path)?;
 
-        serde_json::from_str(&backup_file_contents).expect("Failed to parse backup file")
+        Ok(serde_json::from_str(&backup_file_contents)?)
     }
 
     pub fn add_backup(&self, backup: Backup) -> Result<(), Error> {
-        let mut backups = self.backups();
+        let mut backups = self.backups()?;
         if backups.iter().any(|b| {
             b.client_location.path == backup.client_location.path
                 && b.server_location.path == backup.server_location.path
