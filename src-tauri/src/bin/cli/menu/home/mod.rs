@@ -7,6 +7,8 @@ use std::io;
 use std::process;
 use std::sync::{MutexGuard, PoisonError};
 
+use super::Action;
+
 mod backup;
 
 type StartMenuItemText = String;
@@ -60,14 +62,14 @@ impl From<io::Error> for Error {
 
 enum StartMenuItem {
     AddBackup(StartMenuItemText),
-    RunBackup(StartMenuItemText),
+    HandleBackups(StartMenuItemText),
     Exit(StartMenuItemText),
 }
 
 impl Display for StartMenuItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let text = match self {
-            Self::AddBackup(value) | Self::RunBackup(value) | Self::Exit(value) => value,
+            Self::AddBackup(value) | Self::HandleBackups(value) | Self::Exit(value) => value,
         };
         write!(f, "{text}")
     }
@@ -76,7 +78,12 @@ impl Display for StartMenuItem {
 async fn handle_menu_option(option: StartMenuItem, state: &MutexState) -> Result<(), Error> {
     match option {
         StartMenuItem::AddBackup(_) => backup::add(state).await?,
-        StartMenuItem::RunBackup(_) => backup::select(state).await?,
+        StartMenuItem::HandleBackups(_) => loop {
+            let action = backup::handle(state).await?;
+            if let Action::Exit = action {
+               break; 
+            }
+        },
         StartMenuItem::Exit(_) => process::exit(0),
     };
 
@@ -86,7 +93,7 @@ async fn handle_menu_option(option: StartMenuItem, state: &MutexState) -> Result
 pub async fn show(state: &MutexState) -> Result<(), Error> {
     let options = vec![
         StartMenuItem::AddBackup(String::from("Add backup")),
-        StartMenuItem::RunBackup(String::from("Run backup")),
+        StartMenuItem::HandleBackups(String::from("Handle backups")),
         StartMenuItem::Exit(String::from("Exit")),
     ];
     let prompt_result: Result<StartMenuItem, InquireError> = Select::new("Select option", options)
