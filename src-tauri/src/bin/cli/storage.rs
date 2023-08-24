@@ -80,13 +80,13 @@ impl Storage {
         Some(serde_json::from_str(&config_file_contents).expect("Failed to parse config file"))
     }
 
-    // fn write_conig(&self, config: Config) {
-    //     let config_file_path = self.config_dir.join("server.conf.json");
-    //     let config_file_contents =
-    //         serde_json::to_string(&config).expect("Failed to serialize config");
-    //     std::fs::write(&config_file_path, config_file_contents)
-    //         .expect("Failed to write config file");
-    // }
+    pub fn write_conig(&self, config: Config) {
+        let config_file_path = self.config_dir.join("server.conf.json");
+        let config_file_contents =
+            serde_json::to_string(&config).expect("Failed to serialize config");
+        std::fs::write(&config_file_path, config_file_contents)
+            .expect("Failed to write config file");
+    }
 
     pub fn backups(&self) -> Result<Vec<Backup>, Error> {
         if !self.data_dir.join("backups.json").exists() {
