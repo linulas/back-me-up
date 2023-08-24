@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::{Arc, MutexGuard, PoisonError};
 use tauri::State;
+use bmu::commands;
 
 #[derive(Debug, Serialize)]
 pub enum Error {
@@ -76,6 +77,12 @@ impl From<PoisonError<MutexGuard<'_, PathBuf>>> for Error {
 impl From<openssh::Error> for Error {
     fn from(e: openssh::Error) -> Self {
         Self::Ssh(ssh::Error::Connection(e))
+    }
+}
+
+impl From<commands::Error> for Error {
+    fn from(e: commands::Error) -> Self {
+        Self::Command(e.to_string())
     }
 }
 
@@ -341,19 +348,7 @@ pub fn start_background_backups(
 
 #[tauri::command]
 pub fn get_client_name() -> Result<String, Error> {
-    // TODO: use 'hostname' command for windows
-    let uname = Command::new("uname")
-        .arg("-n") // -n flag to get the network node hostname
-        .output()?;
-
-    if uname.status.success() {
-        Ok(String::from_utf8_lossy(&uname.stdout).trim().to_string())
-    } else {
-        let stdout = String::from_utf8_lossy(&uname.stdout).trim().to_string();
-        let stderr = String::from_utf8_lossy(&uname.stderr).trim().to_string();
-        let why = format!("Getting hostname with command 'uname' failed: {stdout}\n{stderr}");
-        Err(Error::Command(why))
-    }
+    Ok(commands::os::get_hostname()?)
 }
 
 #[tauri::command]
