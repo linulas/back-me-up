@@ -10,7 +10,7 @@ use tauri::{CustomMenuItem, SystemTrayMenu, SystemTrayMenuItem};
 use tauri_plugin_log::fern::colors::ColoredLevelConfig;
 use tauri_plugin_log::LogTarget;
 
-mod commands;
+mod handlers;
 mod event;
 mod tray;
 
@@ -79,18 +79,18 @@ fn main() {
             app_cache_dir: Arc::clone(&init_cache_dir),
         })
         .invoke_handler(tauri::generate_handler![
-            commands::list_home_folders,
-            commands::set_state,
-            commands::set_config,
-            commands::backup_entity,
-            commands::start_background_backups,
-            commands::backup_on_change,
-            commands::terminate_background_backup,
-            commands::terminate_all_background_jobs,
-            commands::drop_pool,
-            commands::reset,
-            commands::get_client_name,
-            commands::check_job_status
+            handlers::list_home_folders,
+            handlers::set_state,
+            handlers::set_config,
+            handlers::backup_entity,
+            handlers::start_background_backups,
+            handlers::backup_on_change,
+            handlers::terminate_background_backup,
+            handlers::terminate_all_background_jobs,
+            handlers::drop_pool,
+            handlers::reset,
+            handlers::get_client_name,
+            handlers::check_job_status
         ])
         .system_tray(app_tray)
         .on_system_tray_event(tray::handle_system_tray_event)
