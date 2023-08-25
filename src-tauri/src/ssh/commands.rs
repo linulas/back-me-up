@@ -21,7 +21,7 @@ pub async fn assert_client_directory_on_server(client: &Sftp, path: &Path) -> Re
     }
 }
 
-pub fn backup_to_server(backup: &Backup, config: &Config) -> Result<(), Error> {
+pub fn backup_to_server(backup: &Backup, config: &Config, is_directory: bool) -> Result<(), Error> {
     #[allow(unused_variables)]
     let connection_string = format!(
         "{}@{}:{}",
@@ -39,10 +39,10 @@ pub fn backup_to_server(backup: &Backup, config: &Config) -> Result<(), Error> {
         backup.server_location.path
     );
 
-    let client_directory = backup.options.as_ref().map_or_else(
+    let entity_location_on_client = backup.options.as_ref().map_or_else(
         || backup.client_location.path.clone(),
         |options| {
-            if options.use_client_directory {
+            if options.use_client_directory || !is_directory {
                 backup.client_location.path.clone()
             } else {
                 format!("{}/", backup.client_location.path.clone())
@@ -55,7 +55,7 @@ pub fn backup_to_server(backup: &Backup, config: &Config) -> Result<(), Error> {
         .arg("-e")
         .arg(format!("ssh -p {}", config.server_port))
         .arg("--exclude=.*")
-        .arg(&client_directory)
+        .arg(&entity_location_on_client)
         .arg(&connection_string)
         .output()?;
 

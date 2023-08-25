@@ -194,33 +194,55 @@ pub fn exec_backup_command(
         .unwrap_or_default()
         .replace(&job.backup.client_location.path, "");
 
+    let server_location_path_without_client_directory = format!(
+        "{}/{}{relative_path}",
+        job.backup.server_location.path, job.config.client_name,
+    );
+
+    let server_location_path = if let Some(option) = &job.backup.options {
+        if option.use_client_directory {
+            format!(
+                "{}/{}/{}{relative_path}",
+                job.backup.server_location.path,
+                job.config.client_name,
+                job.backup.client_location.entity_name
+            )
+        } else {
+            server_location_path_without_client_directory
+        }
+    } else {
+        server_location_path_without_client_directory
+    };
+
     let backup_realtive_to_root = Backup {
         client_location: Location {
             path: path.to_str().unwrap_or_default().to_string(),
             entity_name: job.backup.client_location.entity_name.clone(),
         },
         server_location: Location {
-            path: format!(
-                "{}/{}/{}{relative_path}",
-                job.backup.server_location.path,
-                job.config.client_name,
-                job.backup.client_location.entity_name
-            ),
+            path: server_location_path,
             entity_name: job.backup.server_location.entity_name.clone(),
         },
         latest_run: None,
         options: job.backup.options.clone(),
     };
 
-    // TODO: make type for FILE
-    if data.is_dir() {
+    let is_directory = if data.is_dir() {
         info!("Backup directory: {path:?}");
+        true
     } else {
         info!("Backup file: {path:?}");
-    }
+        false
+    };
+    info!(
+        "Server location: {}",
+        backup_realtive_to_root.server_location.path
+    );
 
     *latest_modified = entity_modified_date;
-    if let Err(e) = ssh::commands::backup_to_server(&backup_realtive_to_root, &job.config) {
+    if let Err(e) =
+        ssh::commands::backup_to_server(&backup_realtive_to_root, &job.config, is_directory)
+    {
         error!("Could not backup: {e:?}");
     }
 
@@ -331,7 +353,7 @@ pub async fn backup_entity(mut backup: Backup, state: Arc<&MutexState>) -> Resul
             .expect("Could not lock jobs")
             .insert(job_id.clone(), worker.id);
 
-        match ssh::commands::backup_to_server(&backup, &config) {
+        match ssh::commands::backup_to_server(&backup, &config, true) {
             Ok(_) => {
                 jobs.lock().expect("Could not lock jobs").remove(&job_id);
             }
