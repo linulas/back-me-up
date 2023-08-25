@@ -124,6 +124,20 @@ impl Storage {
         Ok(())
     }
 
+    pub fn reset(&self) -> Result<(), Error> {
+        if self.cache_dir.exists() {
+            fs::remove_dir_all(&self.cache_dir)?;
+        }
+        if self.config_dir.exists() {
+            fs::remove_dir_all(&self.config_dir)?;
+        }
+        if self.data_dir.exists() {
+            fs::remove_dir_all(&self.data_dir)?;
+        }
+
+        Ok(())
+    }
+
     fn write_backups(&self, backups: Vec<Backup>) {
         let backup_file_path = self.data_dir.join("backups.json");
         let backup_file_contents =

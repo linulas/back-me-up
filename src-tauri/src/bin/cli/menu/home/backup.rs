@@ -1,11 +1,11 @@
 use super::Error;
 use crate::menu::Action;
 use crate::storage;
-use bmu::jobs;
 use bmu::models::app::MutexState;
 use bmu::models::backup::{Backup, Location, Options};
 use bmu::models::storage::Folder;
 use bmu::ssh::commands::list_home_folders;
+use bmu::{commands, jobs};
 use inquire::{Confirm, InquireError, Select};
 use std::fmt::Display;
 use std::io::Write;
@@ -63,7 +63,7 @@ pub async fn handle(state: &MutexState) -> Result<Action, Error> {
 
     match option {
         BackupMenuItem::Run(_) => run(state, backup).await?,
-        BackupMenuItem::Delete(_) => delete(backup).await?,
+        BackupMenuItem::Delete(_) => delete(state, backup).await?,
         BackupMenuItem::Back(_) => return Ok(Action::Show),
     };
 
@@ -129,11 +129,28 @@ pub async fn add(state: &MutexState) -> Result<(), Error> {
     storage.add_backup(backup.clone())?;
     println!("Backup added to storage");
 
-    Ok(run(state, backup).await?)
+    run(state, backup.clone()).await?;
+
+    let config = if let Some(config) = state.config.lock()?.as_ref() {
+        config.clone()
+    } else {
+        return Err(Error::State(String::from("No config detected")));
+    };
+
+    if config.allow_background_backup {
+        commands::app::backup_on_change(state, backup)?;
+    }
+
+    Ok(())
 }
 
-async fn delete(backup: Backup) -> Result<(), Error> {
+async fn delete(state: &MutexState, backup: Backup) -> Result<(), Error> {
     let storage = storage::Storage::load()?;
+    if let Some(config) = state.config.lock()?.as_ref() {
+        if config.allow_background_backup {
+            commands::app::terminate_background_backup(state, backup.clone())?;
+        }
+    }
     Ok(storage.delete_backup(backup)?)
 }
 

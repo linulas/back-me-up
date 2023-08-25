@@ -1,72 +1,12 @@
+use super::{ui, Error};
 use crate::storage;
 use bmu::commands::os::get_hostname;
 use bmu::models::app::{Config, MutexState};
-use bmu::ssh::{self, connect::Connection};
+use bmu::ssh::connect::Connection;
 use inquire::validator::Validation;
-use inquire::{CustomType, InquireError, Text};
-use std::io;
+use inquire::{CustomType, Text};
 use std::net::IpAddr;
-use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::PoisonError;
-
-use super::ui;
-
-#[derive(Debug)]
-pub enum Error {
-    Inquire(InquireError),
-    Io(io::Error),
-    SSH(ssh::Error),
-    Storage(storage::Error),
-}
-
-impl From<InquireError> for Error {
-    fn from(err: InquireError) -> Self {
-        Self::Inquire(err)
-    }
-}
-
-impl From<storage::Error> for Error {
-    fn from(e: storage::Error) -> Self {
-        Self::Storage(e)
-    }
-}
-
-impl From<ssh::Error> for Error {
-    fn from(err: ssh::Error) -> Self {
-        Self::SSH(err)
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Self {
-        Self::Io(err)
-    }
-}
-
-impl From<openssh_sftp_client::Error> for Error {
-    fn from(err: openssh_sftp_client::Error) -> Self {
-        Self::SSH(ssh::Error::from(err))
-    }
-}
-
-impl From<PoisonError<std::sync::MutexGuard<'_, PathBuf>>> for Error {
-    fn from(err: PoisonError<std::sync::MutexGuard<PathBuf>>) -> Self {
-        Self::SSH(ssh::Error::App(err.into()))
-    }
-}
-
-impl From<openssh::Error> for Error {
-    fn from(err: openssh::Error) -> Self {
-        Self::SSH(ssh::Error::from(err))
-    }
-}
-
-impl From<PoisonError<std::sync::MutexGuard<'_, Option<bmu::models::app::Config>>>> for Error {
-    fn from(err: PoisonError<std::sync::MutexGuard<Option<bmu::models::app::Config>>>) -> Self {
-        Self::SSH(ssh::Error::App(err.into()))
-    }
-}
 
 pub async fn set_state_and_test_connection(
     state: &MutexState,
