@@ -3,10 +3,10 @@ use crate::menu::Action;
 use crate::storage;
 use bmu::jobs;
 use bmu::models::app::MutexState;
-use bmu::models::backup::{Backup, Location};
+use bmu::models::backup::{Backup, Location, Options};
 use bmu::models::storage::Folder;
 use bmu::ssh::commands::list_home_folders;
-use inquire::{InquireError, Select};
+use inquire::{Confirm, InquireError, Select};
 use std::fmt::Display;
 use std::io::Write;
 use std::path::PathBuf;
@@ -117,7 +117,7 @@ pub async fn add(state: &MutexState) -> Result<(), Error> {
         client_location: get_client_location()?,
         server_location: get_server_location(state).await?,
         latest_run: None,
-        options: None,
+        options: Some(get_options()?),
     };
 
     println!(
@@ -214,4 +214,15 @@ fn get_client_location() -> Result<Location, Error> {
     }
 
     Err(Error::Path(String::from("Could not parse path")))
+}
+
+fn get_options() -> Result<Options, Error> {
+    let use_client_directory =
+        Confirm::new("Use client directory as top level on the backup server?")
+            .with_default(false)
+            .prompt()?;
+
+    Ok(Options {
+        use_client_directory,
+    })
 }
