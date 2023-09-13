@@ -193,7 +193,7 @@ impl Pool {
             let id = self.workers.len() + 1;
             let mut worker = Worker::new(id, Arc::clone(&self.receiver));
             worker.start();
-            info!("Adding new worker width id {id}");
+            info!("Adding new worker with id {id}");
             self.workers.push(worker);
         }
     }
