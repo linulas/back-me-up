@@ -33,9 +33,10 @@ pub fn directory_on_change(worker: &Arguments, backup: &Backup, config: Config) 
         config,
     };
 
-    watcher
-        .watch(path.as_ref(), RecursiveMode::Recursive)
-        .expect("failed to watch directory");
+    if let Err(e) = watcher.watch(path.as_ref(), RecursiveMode::Recursive) {
+        error!("failed to watch directory: {e:?}");
+        panic!("failed to watch directory");
+    }
 
     info!("watching {}", &backup.client_location.path);
 
