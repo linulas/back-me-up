@@ -34,6 +34,8 @@ pub struct Storage {
     pub cache_dir: PathBuf,
     pub config_dir: PathBuf,
     pub data_dir: PathBuf,
+    pub log_dir: PathBuf,
+    pub daemon_dir: PathBuf,
 }
 
 impl Storage {
@@ -41,6 +43,8 @@ impl Storage {
         let cache_dir = PathBuf::from(env::var("APP_CACHE_DIR")?);
         let config_dir = PathBuf::from(env::var("APP_CONFIG_DIR")?);
         let data_dir = PathBuf::from(env::var("APP_DATA_DIR")?);
+        let log_dir = PathBuf::from(env::var("APP_LOG_DIR")?);
+        let daemon_dir = PathBuf::from(format!("{}/daemon", cache_dir.display()));
 
         if !cache_dir.exists() {
             fs::create_dir_all(&cache_dir)?;
@@ -60,11 +64,25 @@ impl Storage {
         if !data_dir.is_dir() {
             panic!("APP_DATA_DIR is not a directory");
         }
+        if !log_dir.exists() {
+            panic!("APP_DATA_DIR does not exist");
+        }
+        if !log_dir.is_dir() {
+            panic!("APP_DATA_DIR is not a directory");
+        }
+        if !daemon_dir.exists() {
+            panic!("{} does not exist", daemon_dir.display());
+        }
+        if !daemon_dir.is_dir() {
+            panic!("{} is not a directory", daemon_dir.display());
+        }
 
         Ok(Self {
             cache_dir,
             config_dir,
             data_dir,
+            log_dir,
+            daemon_dir
         })
     }
 
