@@ -1,6 +1,7 @@
 use log::error;
 
 use super::Error;
+use std::fs;
 use std::process::Command;
 
 pub fn get_hostname() -> Result<String, Error> {
@@ -74,4 +75,13 @@ pub fn delete_file(file_path: &str) -> Result<(), Error> {
             )))
         }
     }
+}
+
+pub fn directory_exists(path: &str) -> bool {
+    fs::metadata(path).is_ok()
+}
+
+pub fn create_directory(path: &str) -> Result<(), Error> {
+    fs::create_dir(path)?;
+    Ok(())
 }
