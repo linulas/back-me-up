@@ -256,12 +256,6 @@ impl Pool {
     }
 }
 
-impl Drop for Pool {
-    fn drop(&mut self) {
-        self.stop_all_workers();
-    }
-}
-
 pub struct Worker {
     pub id: WorkerId,
     is_available: Arc<Mutex<bool>>,
