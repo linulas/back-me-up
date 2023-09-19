@@ -1,5 +1,5 @@
 use super::{Action, Error};
-use crate::storage;
+use crate::{daemon, storage};
 use bmu::models::app::MutexState;
 use bmu::{commands, jobs};
 use inquire::{Confirm, Select};
@@ -34,6 +34,11 @@ fn set_background_backups(enabled: bool, state: &MutexState) -> Result<Action, E
     config.allow_background_backup = enabled;
     storage.write_conig(config.clone());
     _ = state.config.lock()?.insert(config);
+
+    // skip handling background backups if daemon is running
+    if daemon::is_running(&storage) {
+        return Ok(Action::Show);
+    }
 
     if enabled {
         commands::app::start_background_backups(state, storage.backups()?)?;
@@ -89,9 +94,18 @@ pub async fn show(state: &MutexState) -> Result<Action, Error> {
         SettingsMenuItem::Back(String::from("Back")),
     ];
 
-    let option: SettingsMenuItem = Select::new("Select option", options)
-        .with_vim_mode(true)
-        .prompt()?;
+    let storage = storage::Storage::load()?;
+
+    let option: SettingsMenuItem = if daemon::is_running(&storage) && !allow_background_backups {
+        Select::new("Select option", options)
+            .with_vim_mode(true)
+            .with_help_message("Daemon is running, remember to run 'bmu daemon stop' to fully disable background backups")
+            .prompt()?
+    } else {
+        Select::new("Select option", options)
+            .with_vim_mode(true)
+            .prompt()?
+    };
 
     match option {
         SettingsMenuItem::EnableBackgroundBackups(_) => set_background_backups(true, state),

@@ -1,6 +1,6 @@
 use super::Error;
 use crate::menu::Action;
-use crate::storage;
+use crate::{daemon, storage};
 use bmu::models::app::MutexState;
 use bmu::models::backup::{Backup, Location, Options};
 use bmu::models::storage::Folder;
@@ -105,14 +105,23 @@ async fn select() -> Result<HandleOrGoBack, Error> {
 
     options.push(HandleOrGoBack::Back);
 
-    let option: HandleOrGoBack = Select::new("Select a backup", options)
-        .with_vim_mode(true)
-        .prompt()?;
+    let storage = storage::Storage::load()?;
+
+    let option: HandleOrGoBack = if daemon::is_running(&storage) {
+        Select::new("Select a backup", options)
+            .with_vim_mode(true)
+            .with_help_message("Daemon is running, remember to run 'bmu daemon restart' if you make changes in your backups")
+            .prompt()?
+    } else {
+        Select::new("Select a backup", options)
+            .with_vim_mode(true)
+            .prompt()?
+    };
 
     Ok(option)
 }
 
-pub async fn add(state: &MutexState) -> Result<(), Error> {
+pub async fn add(state: &MutexState) -> Result<Action, Error> {
     let backup = Backup {
         client_location: get_client_location()?,
         server_location: get_server_location(state).await?,
@@ -141,7 +150,7 @@ pub async fn add(state: &MutexState) -> Result<(), Error> {
         commands::app::backup_on_change(state, backup)?;
     }
 
-    Ok(())
+    Ok(Action::Show)
 }
 
 async fn delete(state: &MutexState, backup: Backup) -> Result<(), Error> {

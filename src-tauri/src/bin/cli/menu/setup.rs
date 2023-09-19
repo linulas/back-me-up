@@ -1,33 +1,11 @@
-use super::{ui, Error};
-use crate::storage;
+use super::Error;
+use crate::{storage, set_state_and_test_connection};
 use bmu::commands::os::get_hostname;
 use bmu::models::app::{Config, MutexState};
-use bmu::ssh::connect::Connection;
 use inquire::validator::Validation;
 use inquire::{CustomType, Text};
 use std::net::IpAddr;
 use std::str::FromStr;
-
-pub async fn set_state_and_test_connection(
-    state: &MutexState,
-    config: Config,
-) -> Result<Config, Error> {
-    if let Some(connection) = state.connection.lock().await.take() {
-        connection.sftp_client.close().await?;
-        connection.ssh_session.close().await?;
-    };
-
-    _ = state.config.lock()?.insert(config.clone());
-    let app_cache_dir = state.app_cache_dir.lock()?.clone();
-    let connection = ui::loader(
-        "Testing connection...",
-        Connection::new(config.clone(), app_cache_dir),
-    )
-    .await?;
-    state.connection.lock().await.get_or_insert(connection);
-
-    Ok(config)
-}
 
 fn setup_config() -> Result<Config, Error> {
     let client_name = match get_hostname() {

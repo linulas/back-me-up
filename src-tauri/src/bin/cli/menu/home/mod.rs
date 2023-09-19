@@ -1,8 +1,8 @@
-use super::{handle_inquire_error, settings, Action, Error};
+use super::{settings, Action, Error};
 use bmu::models::app::MutexState;
-use inquire::{error::InquireError, Select};
+use bmu::graceful_exit;
+use inquire::Select;
 use std::fmt::Display;
-use std::process;
 
 mod backup;
 
@@ -27,45 +27,37 @@ impl Display for StartMenuItem {
     }
 }
 
-async fn handle_menu_option(option: StartMenuItem, state: &MutexState) -> Result<(), Error> {
-    match option {
-        StartMenuItem::AddBackup(_) => backup::add(state).await?,
-        StartMenuItem::HandleBackups(_) => loop {
-            let action = backup::handle(state).await?;
-            if let Action::Exit = action {
-                break;
-            }
-        },
-        StartMenuItem::Settings(_) => loop {
-            let action = settings::show(state).await?;
-            if let Action::Exit = action {
-                break;
-            }
-            if let Action::Disconnect = action {
-                process::exit(0);
-            }
-        },
-        StartMenuItem::Exit(_) => process::exit(0),
-    };
-
-    Ok(())
-}
-
-pub async fn show(state: &MutexState) -> Result<(), Error> {
+pub async fn show(state: &MutexState) -> Result<Action, Error> {
     let options = vec![
         StartMenuItem::AddBackup(String::from("Add backup")),
         StartMenuItem::HandleBackups(String::from("Handle backups")),
         StartMenuItem::Settings(String::from("Settings")),
         StartMenuItem::Exit(String::from("Exit")),
     ];
-    let prompt_result: Result<StartMenuItem, InquireError> = Select::new("Select option", options)
+    let option: StartMenuItem = Select::new("Select option", options)
         .with_vim_mode(true)
-        .prompt();
+        .prompt()?;
 
-    match prompt_result {
-        Ok(option) => handle_menu_option(option, state).await?,
-        Err(err) => handle_inquire_error(err),
-    };
-
-    Ok(())
+    match option {
+        StartMenuItem::AddBackup(_) => backup::add(state).await,
+        StartMenuItem::HandleBackups(_) => loop {
+            let action = backup::handle(state).await?;
+            if let Action::Exit = action {
+                return Ok(Action::Show);
+            }
+        },
+        StartMenuItem::Settings(_) => loop {
+            let action = settings::show(state).await?;
+            if let Action::Exit = action {
+                return Ok(Action::Show);
+            } else if let Action::Disconnect = action {
+                graceful_exit(state).await;
+                return Ok(Action::Exit);
+            }
+        },
+        StartMenuItem::Exit(_) => {
+            graceful_exit(state).await;
+            return Ok(Action::Exit);
+        }
+    }
 }

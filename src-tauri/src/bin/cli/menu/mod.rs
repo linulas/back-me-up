@@ -1,12 +1,10 @@
 use super::storage;
-use bmu::jobs::Pool;
-use bmu::models::app::{Config, MutexState};
-use bmu::{commands, jobs, ssh};
+use crate::{daemon, set_state_and_test_connection, Error};
+use bmu::models::app::MutexState;
+use bmu::{commands, jobs};
 use inquire::InquireError;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-use std::{io, process};
+use std::process;
+use std::sync::{Arc, Mutex};
 
 mod home;
 mod settings;
@@ -19,91 +17,6 @@ pub enum Action {
     Exit,
 }
 
-#[derive(Debug)]
-pub enum Error {
-    Inquire(InquireError),
-    Io(io::Error),
-    Path(String),
-    SSH(ssh::Error),
-    State(String),
-    Job(jobs::Error),
-    Storage(storage::Error),
-    Command(commands::Error),
-}
-
-impl From<openssh_sftp_client::Error> for Error {
-    fn from(err: openssh_sftp_client::Error) -> Self {
-        Self::SSH(ssh::Error::from(err))
-    }
-}
-
-impl From<PoisonError<std::sync::MutexGuard<'_, HashMap<std::string::String, usize>>>> for Error {
-    fn from(
-        err: PoisonError<std::sync::MutexGuard<'_, HashMap<std::string::String, usize>>>,
-    ) -> Self {
-        Self::State(err.to_string())
-    }
-}
-
-impl From<PoisonError<std::sync::MutexGuard<'_, Pool>>> for Error {
-    fn from(err: PoisonError<std::sync::MutexGuard<Pool>>) -> Self {
-        Self::State(err.to_string())
-    }
-}
-
-impl From<PoisonError<std::sync::MutexGuard<'_, PathBuf>>> for Error {
-    fn from(err: PoisonError<std::sync::MutexGuard<PathBuf>>) -> Self {
-        Self::SSH(ssh::Error::App(err.into()))
-    }
-}
-
-impl From<openssh::Error> for Error {
-    fn from(err: openssh::Error) -> Self {
-        Self::SSH(ssh::Error::from(err))
-    }
-}
-impl From<storage::Error> for Error {
-    fn from(e: storage::Error) -> Self {
-        Self::Storage(e)
-    }
-}
-
-impl From<commands::Error> for Error {
-    fn from(e: commands::Error) -> Self {
-        Self::Command(e)
-    }
-}
-
-impl From<jobs::Error> for Error {
-    fn from(e: jobs::Error) -> Self {
-        Self::Job(e)
-    }
-}
-
-impl From<PoisonError<MutexGuard<'_, Option<Config>>>> for Error {
-    fn from(e: PoisonError<MutexGuard<Option<Config>>>) -> Self {
-        Self::State(e.to_string())
-    }
-}
-
-impl From<ssh::Error> for Error {
-    fn from(err: ssh::Error) -> Self {
-        Self::SSH(err)
-    }
-}
-
-impl From<InquireError> for Error {
-    fn from(err: InquireError) -> Self {
-        Self::Inquire(err)
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Self {
-        Self::Io(err)
-    }
-}
-
 pub fn handle_inquire_error(err: InquireError) {
     match err {
         InquireError::OperationCanceled => (),
@@ -112,6 +25,7 @@ pub fn handle_inquire_error(err: InquireError) {
     };
 }
 
+#[tokio::main]
 pub async fn show() {
     let storage = match storage::Storage::load() {
         Ok(s) => s,
@@ -142,9 +56,6 @@ pub async fn show() {
         }
     };
 
-    let pattern = format!("{}/.ssh-connection*", storage.cache_dir.display());
-    bmu::jobs::fs::cleanup_entities_by_pattern(&pattern).expect("could not cleanup_connections");
-
     if state
         .config
         .lock()
@@ -154,7 +65,7 @@ pub async fn show() {
     {
         ui::loader(
             "Connecting...",
-            setup::set_state_and_test_connection(&state, config.clone()),
+            set_state_and_test_connection(&state, config.clone()),
         )
         .await
         .expect("Failed to connect to server");
@@ -162,7 +73,7 @@ pub async fn show() {
 
     println!("✅ Connection successfull!\n");
 
-    if config.allow_background_backup {
+    if config.allow_background_backup && !daemon::is_running(&storage) {
         commands::app::start_background_backups(
             &state,
             storage.backups().expect("could not load backups"),
