@@ -203,9 +203,22 @@ fn main() {
         Some(arg) => match arg.as_str() {
             "daemon" => handle_daemon(args),
             "clean" => {
-                let pattern = format!("{cache_dir}/.ssh-connection*");
-                bmu::jobs::fs::cleanup_entities_by_pattern(&pattern)
-                    .expect("could not cleanup_connections");
+                let storage = storage::Storage::load().expect("Could not load storage");
+                let directories = jobs::maintenance::Directories {
+                    cache: storage.cache_dir,
+                    log: storage.log_dir,
+                };
+                let options = jobs::maintenance::Options {
+                    connections: true,
+                    daemon: true,
+                    logs: true,
+                };
+                match jobs::maintenance::clean(directories, Some(options)) {
+                    Err(why) => {
+                        panic!("⛔️ Could not perform cleaning job {why:?}");
+                    }
+                    Ok(_) => println!("Done"),
+                };
             }
             _ => panic!("⛔️ Invalid argument '{arg}'"),
         },
