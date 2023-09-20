@@ -1,6 +1,6 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use bmu::{jobs, models::app::MutexState};
+use back_me_up::{jobs, models::app::MutexState};
 use log::{warn, LevelFilter};
 use std::fs::DirBuilder;
 use std::path::PathBuf;

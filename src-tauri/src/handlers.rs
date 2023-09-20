@@ -1,15 +1,15 @@
 use crate::jobs::{self, Pool};
-use bmu::models::app::{self, Config};
-use bmu::models::backup::Backup;
-use bmu::models::storage::Folder;
-use bmu::ssh::{self, connect::Connection};
+use back_me_up::commands;
+use back_me_up::models::app::{self, Config};
+use back_me_up::models::backup::Backup;
+use back_me_up::models::storage::Folder;
+use back_me_up::ssh::{self, connect::Connection};
 use log::{debug, info};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, MutexGuard, PoisonError};
 use tauri::State;
-use bmu::commands;
 
 #[derive(Debug, Serialize)]
 pub enum Error {

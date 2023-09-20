@@ -1,8 +1,7 @@
+use back_me_up::models::app::Config;
+use back_me_up::models::backup::Backup;
 use std::path::PathBuf;
 use std::{env, fs};
-
-use bmu::models::app::Config;
-use bmu::models::backup::Backup;
 
 #[derive(Debug)]
 pub enum Error {
@@ -82,7 +81,7 @@ impl Storage {
             config_dir,
             data_dir,
             log_dir,
-            daemon_dir
+            daemon_dir,
         })
     }
 

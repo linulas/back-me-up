@@ -1,11 +1,11 @@
 use super::Error;
 use crate::menu::Action;
 use crate::{daemon, storage};
-use bmu::models::app::MutexState;
-use bmu::models::backup::{Backup, Location, Options};
-use bmu::models::storage::Folder;
-use bmu::ssh::commands::list_home_folders;
-use bmu::{commands, jobs};
+use back_me_up::models::app::MutexState;
+use back_me_up::models::backup::{Backup, Location, Options};
+use back_me_up::models::storage::Folder;
+use back_me_up::ssh::commands::list_home_folders;
+use back_me_up::{commands, jobs};
 use inquire::{Confirm, InquireError, Select};
 use std::fmt::Display;
 use std::io::Write;

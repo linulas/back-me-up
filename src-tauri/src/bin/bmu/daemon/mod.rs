@@ -1,8 +1,8 @@
 use crate::storage::Storage;
 use crate::{set_state_and_test_connection, storage};
-use bmu::graceful_exit;
-use bmu::models::app::MutexState;
-use bmu::{commands, jobs};
+use back_me_up::graceful_exit;
+use back_me_up::models::app::MutexState;
+use back_me_up::{commands, jobs};
 use daemonize::Daemonize;
 use std::fs::File;
 use std::io::Write;
@@ -23,7 +23,7 @@ async fn main() {
         failed_jobs: Arc::new(Mutex::default()),
         pool: Mutex::new(pool),
         app_cache_dir: Arc::new(Mutex::new(storage.cache_dir.clone())),
-        app_log_dir: Arc::new(Mutex::new(storage.log_dir.clone()))
+        app_log_dir: Arc::new(Mutex::new(storage.log_dir.clone())),
     };
     let config = storage
         .config()

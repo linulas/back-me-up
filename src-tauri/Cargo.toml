@@ -1,11 +1,11 @@
 [package]
-name = "bmu"
+name = "back_me_up"
 version = "1.1.0"
 description = "A simple tauri app that uses openssh to back up files to a remote server."
 authors = ["Linus Brännström"]
 license = "MIT"
 repository = "https://github.com/linulas/back-me-up"
-default-run = "bmu"
+default-run = "back_me_up"
 edition = "2021"
 rust-version = "1.60"
 
@@ -43,4 +43,4 @@ dotenv = "0.15.0"
 custom-protocol = ["tauri/custom-protocol"]
 
 [[bin]]
-name = "cli"
+name = "bmu"

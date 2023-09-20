@@ -1,7 +1,7 @@
 use super::storage;
 use crate::{daemon, set_state_and_test_connection, Error};
-use bmu::models::app::MutexState;
-use bmu::{commands, jobs};
+use back_me_up::models::app::MutexState;
+use back_me_up::{commands, jobs};
 use inquire::InquireError;
 use std::process;
 use std::sync::{Arc, Mutex};

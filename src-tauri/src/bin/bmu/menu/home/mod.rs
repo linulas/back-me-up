@@ -1,6 +1,6 @@
 use super::{settings, Action, Error};
-use bmu::models::app::MutexState;
-use bmu::graceful_exit;
+use back_me_up::models::app::MutexState;
+use back_me_up::graceful_exit;
 use inquire::Select;
 use std::fmt::Display;
 

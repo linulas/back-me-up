@@ -1,7 +1,7 @@
 use super::Error;
-use crate::{storage, set_state_and_test_connection};
-use bmu::commands::os::get_hostname;
-use bmu::models::app::{Config, MutexState};
+use crate::{set_state_and_test_connection, storage};
+use back_me_up::commands::os::get_hostname;
+use back_me_up::models::app::{Config, MutexState};
 use inquire::validator::Validation;
 use inquire::{CustomType, Text};
 use std::net::IpAddr;

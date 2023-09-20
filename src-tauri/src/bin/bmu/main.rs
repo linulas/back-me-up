@@ -1,10 +1,10 @@
 use self::menu::ui;
-use bmu::commands::os::{create_directory, directory_exists};
-use bmu::jobs::Pool;
-use bmu::models::app::Config as AppConfig;
-use bmu::models::app::MutexState;
-use bmu::ssh::connect::Connection;
-use bmu::{commands, jobs, ssh};
+use back_me_up::commands::os::{create_directory, directory_exists};
+use back_me_up::jobs::Pool;
+use back_me_up::models::app::Config as AppConfig;
+use back_me_up::models::app::MutexState;
+use back_me_up::ssh::connect::Connection;
+use back_me_up::{commands, jobs, ssh};
 use inquire::InquireError;
 use log::LevelFilter;
 use log4rs::append::file::FileAppender;

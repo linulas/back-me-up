@@ -1,4 +1,4 @@
-use bmu::graceful_exit;
+use back_me_up::graceful_exit;
 use futures::executor;
 use log::error;
 use log::warn;
@@ -55,7 +55,7 @@ pub fn handle_system_tray_event(app: &AppHandle, event: SystemTrayEvent) {
                     },
                     |app_cache_dir| {
                         let pattern = format!("{}/.ssh-connection*", app_cache_dir.display());
-                        bmu::jobs::fs::cleanup_entities_by_pattern(&pattern)
+                        back_me_up::jobs::fs::cleanup_entities_by_pattern(&pattern)
                             .expect("could not cleanup_connections");
                     },
                 );
