@@ -1,10 +1,10 @@
 use back_me_up::graceful_exit;
-use futures::executor;
 use log::error;
 use log::warn;
 use tauri::AppHandle;
 use tauri::Manager;
 use tauri::SystemTrayEvent;
+use tokio::runtime::Runtime;
 
 fn create_main_window(app: &AppHandle) {
     app.get_window("main").map_or_else(
@@ -48,7 +48,9 @@ pub fn handle_system_tray_event(app: &AppHandle, event: SystemTrayEvent) {
             "open" => create_main_window(app),
             "settings" => create_settings_window(app),
             "quit" => {
-                executor::block_on(graceful_exit(&app.state()));
+                let rt = Runtime::new().unwrap();
+                let handle = rt.handle();
+                handle.block_on(graceful_exit(&app.state()));
                 app.path_resolver().app_cache_dir().map_or_else(
                     || {
                         warn!("Could not find app cache directory");
