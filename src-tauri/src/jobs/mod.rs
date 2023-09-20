@@ -4,6 +4,7 @@ use crate::ssh;
 use log::{error, info, warn};
 use serde::Serialize;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, SendError, Sender};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
@@ -13,6 +14,7 @@ const IS_AVAILABLE_SHOULD_LOCK: &str = "could not lock field 'is_available'";
 
 pub mod backup;
 pub mod fs;
+pub mod maintenance;
 
 pub type Id = String;
 pub type WorkerId = usize;
@@ -30,6 +32,12 @@ pub enum Error {
     Pattern(String),
     Command(String),
     Failed(String),
+}
+
+impl From<PoisonError<std::sync::MutexGuard<'_, PathBuf>>> for Error {
+    fn from(e: PoisonError<std::sync::MutexGuard<PathBuf>>) -> Self {
+        Self::App(app::Error::from(e))
+    }
 }
 
 impl From<ssh::Error> for Error {
