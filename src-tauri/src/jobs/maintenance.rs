@@ -1,4 +1,4 @@
-use crate::models::app::MutexState;
+use std::path::PathBuf;
 
 use super::Error;
 
@@ -6,6 +6,11 @@ pub struct Options {
     pub connections: bool,
     pub daemon: bool,
     pub logs: bool,
+}
+
+pub struct Directories {
+    pub cache: PathBuf,
+    pub log: PathBuf,
 }
 
 impl Default for Options {
@@ -18,23 +23,21 @@ impl Default for Options {
     }
 }
 
-pub fn clean(state: &MutexState, opts: Option<Options>) -> Result<(), Error> {
+pub fn clean(directories: Directories, opts: Option<Options>) -> Result<(), Error> {
     let options = opts.unwrap_or_default();
-    let cache_dir = state.app_cache_dir.lock()?.clone();
 
     if options.connections {
-        let pattern = format!("{}/.ssh-connection*", cache_dir.display());
+        let pattern = format!("{}/.ssh-connection*", directories.cache.display());
         super::fs::cleanup_entities_by_pattern(&pattern)?;
     }
 
     if options.daemon {
-        let pattern = format!("{}/daemon/*", cache_dir.display());
+        let pattern = format!("{}/daemon/*", directories.cache.display());
         super::fs::cleanup_entities_by_pattern(&pattern)?;
     }
 
     if options.logs {
-        let log_dir = state.app_log_dir.lock()?.clone();
-        let pattern = format!("{}/*.log", log_dir.display());
+        let pattern = format!("{}/*.log", directories.log.display());
         super::fs::cleanup_entities_by_pattern(&pattern)?;
     }
 
