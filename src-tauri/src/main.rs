@@ -10,8 +10,8 @@ use tauri::{CustomMenuItem, SystemTrayMenu, SystemTrayMenuItem};
 use tauri_plugin_log::fern::colors::ColoredLevelConfig;
 use tauri_plugin_log::LogTarget;
 
-mod handlers;
 mod event;
+mod handlers;
 mod tray;
 
 #[cfg(debug_assertions)]
@@ -36,7 +36,9 @@ fn main() {
     let app_tray = SystemTray::new().with_menu(tray_menu);
     let pool = jobs::Pool::new(None);
     let init_cache_dir: Arc<Mutex<PathBuf>> = Arc::new(Mutex::default());
+    let init_log_dir: Arc<Mutex<PathBuf>> = Arc::new(Mutex::default());
     let app_cache_dir_for_setup = Arc::clone(&init_cache_dir);
+    let app_log_dir_for_setup = Arc::clone(&init_cache_dir);
 
     tauri::Builder::default()
         .setup(move |app| {
@@ -51,9 +53,20 @@ fn main() {
                             .create(&dir)
                             .expect("could not create app cache directory");
                     }
-                    let pattern = format!("{}/.ssh-connection*", dir.display());
-                    jobs::fs::cleanup_entities_by_pattern(&pattern)
-                        .expect("could not cleanup_connections");
+                    dir
+                },
+            );
+            let app_log_dir = app.path_resolver().app_log_dir().map_or_else(
+                || {
+                    warn!("Could not find app log directory");
+                    PathBuf::from("./")
+                },
+                |dir| {
+                    if !dir.exists() {
+                        DirBuilder::new()
+                            .create(&dir)
+                            .expect("could not create app cache directory");
+                    }
                     dir
                 },
             );
@@ -61,6 +74,9 @@ fn main() {
             *app_cache_dir_for_setup
                 .lock()
                 .expect("could not lock app cache dir on setup") = app_cache_dir;
+            *app_log_dir_for_setup
+                .lock()
+                .expect("could not lock app cache dir on setup") = app_log_dir;
             Ok(())
         })
         .plugin(
@@ -77,6 +93,7 @@ fn main() {
             failed_jobs: Arc::new(Mutex::default()),
             pool: Mutex::new(pool),
             app_cache_dir: Arc::clone(&init_cache_dir),
+            app_log_dir: Arc::clone(&init_log_dir),
         })
         .invoke_handler(tauri::generate_handler![
             handlers::list_home_folders,

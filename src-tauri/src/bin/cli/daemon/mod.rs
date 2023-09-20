@@ -23,6 +23,7 @@ async fn main() {
         failed_jobs: Arc::new(Mutex::default()),
         pool: Mutex::new(pool),
         app_cache_dir: Arc::new(Mutex::new(storage.cache_dir.clone())),
+        app_log_dir: Arc::new(Mutex::new(storage.log_dir.clone()))
     };
     let config = storage
         .config()

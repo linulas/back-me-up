@@ -55,4 +55,5 @@ pub struct MutexState {
     pub failed_jobs: Arc<Mutex<jobs::Failed>>,
     pub pool: Mutex<jobs::Pool>,
     pub app_cache_dir: Arc<Mutex<PathBuf>>,
+    pub app_log_dir: Arc<Mutex<PathBuf>>,
 }
