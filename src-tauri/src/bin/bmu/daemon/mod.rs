@@ -27,7 +27,7 @@ async fn main() {
     };
     let config = storage
         .config()
-        .expect("No config detected, please run 'bmu_cli' to setup");
+        .expect("No config detected, please run 'bmu' to setup");
 
     match set_state_and_test_connection(&state, config.clone()).await {
         Ok(_) => println!("✅ Connection successfull!\n"),
@@ -58,7 +58,7 @@ async fn main() {
 }
 
 pub fn start() {
-    let storage = storage::Storage::load().expect("⛔️ Could not load storage: {why:?}\nYou might need to initialize setup by running 'bmu_cli' first");
+    let storage = storage::Storage::load().expect("⛔️ Could not load storage: {why:?}\nYou might need to initialize setup by running 'bmu' first");
     if is_running(&storage) {
         println!("Daemon is already running");
         process::exit(0);
@@ -79,10 +79,10 @@ pub fn start() {
 
     let config = storage
         .config()
-        .expect("No config detected, please run 'bmu_cli' to setup");
+        .expect("No config detected, please run 'bmu' to setup");
 
     if !config.allow_background_backup {
-        panic!("⛔️ Background backups are disabled, please run 'bmu_cli' and go into settings to enable them");
+        panic!("⛔️ Background backups are disabled, please run 'bmu' and go into settings to enable them");
     }
 
     crate::menu::ui::print_frame(
