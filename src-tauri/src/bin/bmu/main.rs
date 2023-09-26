@@ -220,6 +220,7 @@ fn main() {
                     Ok(_) => println!("Done"),
                 };
             }
+            "help" => help(),
             _ => panic!("⛔️ Invalid argument '{arg}'"),
         },
         None => {
@@ -234,6 +235,33 @@ fn main() {
             menu::show()
         }
     }
+}
+
+fn help() {
+    let messages = vec![
+        format!("To start the interactive menu: bmu\n"),
+        format!("Other usage: bmu [daemon|clean|help]"),
+        format!("{:10} {:22}", "  daemon", "[start|restart|stop]",),
+        format!(
+            "{:10} {:22} -- {}",
+            "   start", "", "Starts background backups in a daemon"
+        ),
+        format!(
+            "{:10} {:22} -- {}",
+            "   stop", "", "Stops the deamon if its running"
+        ),
+        format!(
+            "{:10} {:22} -- {}",
+            "   restart", "", "Restarts the deamon if its running"
+        ),
+        format!(
+            "{:10} {:22} -- {}",
+            "  clean", "", "Clean the cache and logs"
+        ),
+        format!("{:10} {:22} -- {}", "  help", "", "Show this help message"),
+    ];
+
+    menu::ui::print_frame(TITLE, messages, true);
 }
 
 fn handle_daemon(args: Vec<String>) {
