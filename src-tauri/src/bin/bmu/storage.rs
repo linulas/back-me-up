@@ -45,35 +45,20 @@ impl Storage {
         let log_dir = PathBuf::from(env::var("APP_LOG_DIR")?);
         let daemon_dir = PathBuf::from(format!("{}/daemon", cache_dir.display()));
 
-        if !cache_dir.exists() {
+        if !cache_dir.exists() || !cache_dir.is_dir() {
             fs::create_dir_all(&cache_dir)?;
-        }
-        if !cache_dir.is_dir() {
-            fs::create_dir_all(&cache_dir)?;
-        }
-        if !config_dir.exists() {
+        } 
+        if !config_dir.exists() || !config_dir.is_dir() {
             fs::create_dir_all(&config_dir)?;
         }
-        if !config_dir.is_dir() {
-            panic!("APP_CONFIG_DIR is not a directory");
+        if !data_dir.exists() || !data_dir.is_dir() {
+            fs::create_dir_all(&data_dir)?;
         }
-        if !data_dir.exists() {
-            panic!("APP_DATA_DIR does not exist");
+        if !log_dir.exists() || !log_dir.is_dir() {
+            fs::create_dir_all(&log_dir)?;
         }
-        if !data_dir.is_dir() {
-            panic!("APP_DATA_DIR is not a directory");
-        }
-        if !log_dir.exists() {
-            panic!("APP_DATA_DIR does not exist");
-        }
-        if !log_dir.is_dir() {
-            panic!("APP_DATA_DIR is not a directory");
-        }
-        if !daemon_dir.exists() {
-            panic!("{} does not exist", daemon_dir.display());
-        }
-        if !daemon_dir.is_dir() {
-            panic!("{} is not a directory", daemon_dir.display());
+        if !daemon_dir.exists() || !daemon_dir.is_dir() {
+            fs::create_dir_all(&daemon_dir)?;
         }
 
         Ok(Self {
@@ -92,16 +77,16 @@ impl Storage {
 
         let config_file_path = self.config_dir.join("server.conf.json");
         let config_file_contents =
-            std::fs::read_to_string(&config_file_path).expect("Failed to read config file");
+            std::fs::read_to_string(config_file_path).expect("Failed to read config file");
 
         Some(serde_json::from_str(&config_file_contents).expect("Failed to parse config file"))
     }
 
-    pub fn write_conig(&self, config: Config) {
+    pub fn write_conig(&self, config: &Config) {
         let config_file_path = self.config_dir.join("server.conf.json");
         let config_file_contents =
             serde_json::to_string(&config).expect("Failed to serialize config");
-        std::fs::write(&config_file_path, config_file_contents)
+        std::fs::write(config_file_path, config_file_contents)
             .expect("Failed to write config file");
     }
 
@@ -111,7 +96,7 @@ impl Storage {
         }
 
         let backup_file_path = self.data_dir.join("backups.json");
-        let backup_file_contents = std::fs::read_to_string(&backup_file_path)?;
+        let backup_file_contents = std::fs::read_to_string(backup_file_path)?;
 
         Ok(serde_json::from_str(&backup_file_contents)?)
     }
@@ -125,18 +110,18 @@ impl Storage {
             return Err(Error::NotUnique("Backup already exists".to_string()));
         };
         backups.push(backup);
-        self.write_backups(backups);
+        self.write_backups(&backups);
 
         Ok(())
     }
 
-    pub fn delete_backup(&self, backup: Backup) -> Result<(), Error> {
+    pub fn delete_backup(&self, backup: &Backup) -> Result<(), Error> {
         let mut backups = self.backups()?;
         backups.retain(|b| {
             b.client_location.path != backup.client_location.path
                 || b.server_location.path != backup.server_location.path
         });
-        self.write_backups(backups);
+        self.write_backups(&backups);
 
         Ok(())
     }
@@ -155,11 +140,11 @@ impl Storage {
         Ok(())
     }
 
-    fn write_backups(&self, backups: Vec<Backup>) {
+    fn write_backups(&self, backups: &[Backup]) {
         let backup_file_path = self.data_dir.join("backups.json");
         let backup_file_contents =
             serde_json::to_string(&backups).expect("Failed to serialize backup file");
-        std::fs::write(&backup_file_path, backup_file_contents)
+        std::fs::write(backup_file_path, backup_file_contents)
             .expect("Failed to write backup file");
     }
 }

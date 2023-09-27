@@ -8,10 +8,8 @@ use std::net::IpAddr;
 use std::str::FromStr;
 
 fn setup_config() -> Result<Config, Error> {
-    let client_name = match get_hostname() {
-        Ok(hostname) => hostname,
-        Err(_) => String::from("unknown_client"), // TODO: append UID to string
-    };
+    let client_name =
+        get_hostname().map_or_else(|_| String::from("unknown_client"), |hostname| hostname); // TODO: append UID to string
     let validator = |input: &str| {
         if input.chars().count() > 50 {
             Ok(Validation::Invalid(
@@ -53,10 +51,10 @@ fn setup_config() -> Result<Config, Error> {
 pub async fn begin(state: &MutexState) -> Result<Config, Error> {
     loop {
         if let Ok(config) = set_state_and_test_connection(state, setup_config()?).await {
-            storage::Storage::load()?.write_conig(config.clone());
+            storage::Storage::load()?.write_conig(&config);
             return Ok(config);
-        } else {
-            println!("⛔️ Could not connect with the provided credentials, try again and make sure your credentials are correct.\n");
         }
+
+        println!("⛔️ Could not connect with the provided credentials, try again and make sure your credentials are correct.\n");
     }
 }

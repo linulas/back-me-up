@@ -26,7 +26,9 @@ pub fn get_hostname() -> Result<String, Error> {
 pub fn create_file(file_path: &str) -> Result<(), Error> {
     match Command::new("touch").args([&file_path]).output() {
         Ok(output) => {
-            if !output.status.success() {
+            if output.status.success() {
+                Ok(())
+            } else {
                 let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
                 let why = format!("Failed to create file: {stdout}\n{stderr}");
@@ -35,8 +37,6 @@ pub fn create_file(file_path: &str) -> Result<(), Error> {
                     std::io::ErrorKind::Other,
                     why,
                 )))
-            } else {
-                Ok(())
             }
         }
         Err(e) => {
@@ -53,7 +53,9 @@ pub fn create_file(file_path: &str) -> Result<(), Error> {
 pub fn delete_file(file_path: &str) -> Result<(), Error> {
     match Command::new("rm").args([&file_path]).output() {
         Ok(output) => {
-            if !output.status.success() {
+            if output.status.success() {
+                Ok(())
+            } else {
                 let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
                 let why = format!("Failed to remove file: {stdout}\n{stderr}");
@@ -62,8 +64,6 @@ pub fn delete_file(file_path: &str) -> Result<(), Error> {
                     std::io::ErrorKind::Other,
                     why,
                 )))
-            } else {
-                Ok(())
             }
         }
         Err(e) => {
@@ -77,6 +77,7 @@ pub fn delete_file(file_path: &str) -> Result<(), Error> {
     }
 }
 
+#[must_use]
 pub fn directory_exists(path: &str) -> bool {
     fs::metadata(path).is_ok()
 }

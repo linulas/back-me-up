@@ -16,6 +16,10 @@ pub struct WatchDirectory {
     config: app::Config,
 }
 
+/// Starts a thread watching a directory for changes and backs up files accordingly.
+///
+/// # Panics
+/// Panics if the directory does not exist, or if the watcher for some reason could not start successfully.
 pub fn directory_on_change(worker: &Arguments, backup: &Backup, config: Config) {
     let worker_receiver = worker.receiver.lock().expect("Must have a thread receiver");
     let path = Path::new(&backup.client_location.path);
@@ -143,7 +147,7 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
     }
 }
 
-pub fn exec_backup_command(
+fn exec_backup_command(
     event: &Event,
     job: &WatchDirectory,
     latest_modified: &mut DateTime<Local>,
@@ -267,7 +271,10 @@ fn handle_notify_event(
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn terminate_all(jobs: &mut MutexGuard<HashMap<String, usize>>, pool: &mut MutexGuard<Pool>) {
+pub fn terminate_all<S: ::std::hash::BuildHasher>(
+    jobs: &mut MutexGuard<HashMap<String, usize, S>>,
+    pool: &mut MutexGuard<Pool>,
+) {
     jobs.iter_mut().for_each(|(job_id, worker)| {
         info!("Terminating job: {job_id}");
         let client_folder_path = job_id.split('_').next().expect("Could not split job_id");
@@ -310,8 +317,9 @@ pub fn terminate_all(jobs: &mut MutexGuard<HashMap<String, usize>>, pool: &mut M
     jobs.clear();
 }
 
-pub async fn backup_entity(mut backup: Backup, state: Arc<&MutexState>) -> Result<String, Error> {
-    let config = match state.config.lock()?.as_ref() {
+pub async fn entity_to_server(mut backup: Backup, state: Arc<&MutexState>) -> Result<String, Error> {
+    let config_mutex = state.config.lock()?.clone();
+    let config = match config_mutex {
         Some(config) => config.clone(),
         None => return Err(Error::App(app::Error::Config(String::from("No config")))),
     };
@@ -321,17 +329,14 @@ pub async fn backup_entity(mut backup: Backup, state: Arc<&MutexState>) -> Resul
     );
 
     let connection = state.connection.lock().await;
-    let client = match connection.as_ref() {
+    let connection_ref = connection.as_ref();
+    let client = match connection_ref {
         Some(connection) => Arc::new(&connection.sftp_client),
         None => {
             return Err(Error::App(app::Error::MissingConnection(String::from(
                 "No connection",
             ))));
         }
-    };
-    let config = match state.config.lock()?.as_ref() {
-        Some(config) => config.clone(),
-        None => return Err(Error::App(app::Error::Config(String::from("No config")))),
     };
 
     let path = Path::new(&folder_to_assert);

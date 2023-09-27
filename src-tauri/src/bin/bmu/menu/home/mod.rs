@@ -1,6 +1,5 @@
 use super::{settings, Action, Error};
 use back_me_up::models::app::MutexState;
-use back_me_up::graceful_exit;
 use inquire::Select;
 use std::fmt::Display;
 
@@ -42,22 +41,18 @@ pub async fn show(state: &MutexState) -> Result<Action, Error> {
         StartMenuItem::AddBackup(_) => backup::add(state).await,
         StartMenuItem::HandleBackups(_) => loop {
             let action = backup::handle(state).await?;
-            if let Action::Exit = action {
+            if matches!(action, Action::Exit) {
                 return Ok(Action::Show);
             }
         },
         StartMenuItem::Settings(_) => loop {
             let action = settings::show(state).await?;
-            if let Action::Exit = action {
+            if matches!(action, Action::Exit) {
                 return Ok(Action::Show);
-            } else if let Action::Disconnect = action {
-                graceful_exit(state).await;
+            } else if matches!(action, Action::Disconnect) {
                 return Ok(Action::Exit);
             }
         },
-        StartMenuItem::Exit(_) => {
-            graceful_exit(state).await;
-            return Ok(Action::Exit);
-        }
+        StartMenuItem::Exit(_) => Ok(Action::Exit),
     }
 }

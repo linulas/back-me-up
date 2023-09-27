@@ -26,13 +26,14 @@ impl Display for SettingsMenuItem {
 
 fn set_background_backups(enabled: bool, state: &MutexState) -> Result<Action, Error> {
     let storage = storage::Storage::load()?;
-    let mut config = match state.config.lock()?.as_ref() {
-        Some(config) => config.clone(),
+    let config_mutex = state.config.lock()?.clone();
+    let mut config = match config_mutex {
+        Some(config) => config,
         None => return Err(Error::State(String::from("No config found"))),
     };
 
     config.allow_background_backup = enabled;
-    storage.write_conig(config.clone());
+    storage.write_conig(&config);
     _ = state.config.lock()?.insert(config);
 
     // skip handling background backups if daemon is running
@@ -41,7 +42,7 @@ fn set_background_backups(enabled: bool, state: &MutexState) -> Result<Action, E
     }
 
     if enabled {
-        commands::app::start_background_backups(state, storage.backups()?)?;
+        commands::app::start_background_backups(state, &storage.backups()?)?;
     } else {
         let mut jobs = state.jobs.lock()?;
         let mut pool = state.pool.lock()?;
@@ -80,7 +81,8 @@ async fn disconnect(state: &MutexState) -> Result<Action, Error> {
 }
 
 pub async fn show(state: &MutexState) -> Result<Action, Error> {
-    let allow_background_backups = match state.config.lock()?.as_ref() {
+    let config_mutex = state.config.lock()?.clone();
+    let allow_background_backups = match config_mutex {
         Some(config) => config.allow_background_backup,
         None => false,
     };
@@ -111,6 +113,6 @@ pub async fn show(state: &MutexState) -> Result<Action, Error> {
         SettingsMenuItem::EnableBackgroundBackups(_) => set_background_backups(true, state),
         SettingsMenuItem::DisableBackgroundBackups(_) => set_background_backups(false, state),
         SettingsMenuItem::Disconnect(_) => disconnect(state).await,
-        SettingsMenuItem::Back(_) => return Ok(Action::Exit),
+        SettingsMenuItem::Back(_) => Ok(Action::Exit),
     }
 }

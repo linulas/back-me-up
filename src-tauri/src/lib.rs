@@ -28,7 +28,7 @@ pub async fn graceful_exit(state: &models::app::MutexState) {
 
     let mut jobs = state.jobs.lock().expect("could not lock jobs");
     let mut pool = state.pool.lock().expect("could not lock pool");
-    let total_jobs_to_terminate = jobs.len().clone();
+    let total_jobs_to_terminate = jobs.len();
 
     print!("\r⏳ Terminating jobs...      "); // add trailing blankspaces to overwrite previous loading output
     io::stdout().flush().expect("failed to flush stdout");

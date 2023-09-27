@@ -23,7 +23,7 @@ impl Default for Options {
     }
 }
 
-pub fn clean(directories: Directories, opts: Option<Options>) -> Result<(), Error> {
+pub fn clean(directories: &Directories, opts: Option<Options>) -> Result<(), Error> {
     let options = opts.unwrap_or_default();
 
     if options.connections {

@@ -20,6 +20,7 @@ pub fn print_frame(title: &str, messages_to_print: Vec<String>, emojis_in_title:
     println!("\n{one_side_of_dashes}{fill_gap_from_title}{one_side_of_dashes}\n");
 }
 
+#[allow(clippy::future_not_send)] // WARN: Future is not Send, passing states in callback can lead to deadlocks
 pub async fn loader<T, E>(text: &str, callback: impl Future<Output = Result<T, E>>) -> Result<T, E>
 where
     E: std::fmt::Debug,

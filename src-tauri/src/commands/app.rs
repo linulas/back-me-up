@@ -42,9 +42,9 @@ pub fn backup_on_change(state: &MutexState, backup: Backup) -> Result<(), Error>
     Ok(())
 }
 
-pub fn terminate_background_backup(state: &MutexState, backup: Backup) -> Result<(), Error> {
+pub fn terminate_background_backup(state: &MutexState, backup: &Backup) -> Result<(), Error> {
     let mut jobs = state.jobs.lock()?;
-    let job_id = &jobs::id_from_backup(&backup, &jobs::Kind::BackupOnChange);
+    let job_id = &jobs::id_from_backup(backup, &jobs::Kind::BackupOnChange);
     let worker_id = if let Some(id) = jobs.get(job_id) {
         id
     } else {
@@ -56,8 +56,8 @@ pub fn terminate_background_backup(state: &MutexState, backup: Backup) -> Result
     let result = pool.terminate_job(*worker_id, || {
         let file_path = format!("{}/.bmu_event_trigger", backup.client_location.path);
 
-        let _ = super::os::create_file(&file_path);
-        let _ = super::os::delete_file(&file_path);
+        _ = super::os::create_file(&file_path);
+        _ = super::os::delete_file(&file_path);
     });
 
     if let Err(e) = result {
@@ -75,7 +75,7 @@ pub fn terminate_background_backup(state: &MutexState, backup: Backup) -> Result
     }
 }
 
-pub fn start_background_backups(state: &MutexState, backups: Vec<Backup>) -> Result<(), Error> {
+pub fn start_background_backups(state: &MutexState, backups: &[Backup]) -> Result<(), Error> {
     let state_config = &state.config.lock()?;
 
     if let Some(config) = state_config.as_ref() {

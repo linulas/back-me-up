@@ -107,63 +107,14 @@ impl From<io::Error> for Error {
         Self::Io(err)
     }
 }
+
 fn main() {
-    let os = env::consts::OS;
     let user = env::var_os("USER").expect(USER_PANIC);
     let args = env::args().collect::<Vec<String>>();
 
-    if user.is_empty() {
-        panic!("{USER_PANIC}");
-    }
+    set_envs();
 
-    let home_dir_os_string = if let Some(dir) = env::var_os("HOME") {
-        dir.clone()
-    } else if let Some(dir) = env::var_os("USERPROFILE") {
-        dir.clone()
-    } else {
-        panic!("Unable to determine user's home directory");
-    };
-
-    let home_dir = home_dir_os_string.to_str().expect("HOME not set");
-
-    // INFO: Based on tauri path: https://tauri.app/v1/api/js/path/#functions
-    if os == "linux" {
-        env::set_var(
-            "APP_CACHE_DIR",
-            format!("{home_dir}/.cache/{BUNDLE_IDENTIFIER}"),
-        );
-        env::set_var(
-            "APP_CONFIG_DIR",
-            format!("{home_dir}/.config/{BUNDLE_IDENTIFIER}"),
-        );
-        env::set_var(
-            "APP_DATA_DIR",
-            format!("{home_dir}/.local/share/{BUNDLE_IDENTIFIER}"),
-        );
-        env::set_var(
-            "APP_LOG_DIR",
-            format!("{home_dir}/.config/{BUNDLE_IDENTIFIER}/logs"),
-        )
-    } else if os == "macos" {
-        env::set_var(
-            "APP_CACHE_DIR",
-            format!("{home_dir}/Library/Caches/{BUNDLE_IDENTIFIER}"),
-        );
-        env::set_var(
-            "APP_CONFIG_DIR",
-            format!("{home_dir}/Library/Application Support/{BUNDLE_IDENTIFIER}"),
-        );
-        env::set_var(
-            "APP_DATA_DIR",
-            format!("{home_dir}/Library/Application Support/{BUNDLE_IDENTIFIER}"),
-        );
-        env::set_var(
-            "APP_LOG_DIR",
-            format!("{home_dir}/Library/Logs/{BUNDLE_IDENTIFIER}"),
-        )
-    } else {
-        panic!("Unsupported OS");
-    }
+    assert!(!user.is_empty(), "{USER_PANIC}");
 
     let cache_dir = env::var("APP_CACHE_DIR").expect("APP_CACHE_DIR not set");
     let config_dir = env::var("APP_CONFIG_DIR").expect("APP_CONFIG_DIR not set");
@@ -199,9 +150,20 @@ fn main() {
 
     log4rs::init_config(config).expect("could not init log4rs");
 
-    match args.get(1) {
-        Some(arg) => match arg.as_str() {
-            "daemon" => handle_daemon(args),
+    args.get(1).map_or_else(
+        || {
+            let messages = vec![
+                format!("USER: {}", user.to_str().expect(USER_PANIC)),
+                format!("APP_CACHE_DIR: {cache_dir}"),
+                format!("APP_CONFIG_DIR: {config_dir}"),
+                format!("APP_DATA_DIR: {data_dir}"),
+                format!("APP_LOG_DIR: {log_dir}"),
+            ];
+            menu::ui::print_frame(TITLE, messages, true);
+            menu::show();
+        },
+        |arg| match arg.as_str() {
+            "daemon" => handle_daemon(&args),
             "clean" => {
                 let storage = storage::Storage::load().expect("Could not load storage");
                 let directories = jobs::maintenance::Directories {
@@ -213,7 +175,7 @@ fn main() {
                     daemon: true,
                     logs: true,
                 };
-                match jobs::maintenance::clean(directories, Some(options)) {
+                match jobs::maintenance::clean(&directories, Some(options)) {
                     Err(why) => {
                         panic!("⛔️ Could not perform cleaning job {why:?}");
                     }
@@ -223,17 +185,59 @@ fn main() {
             "help" => help(),
             _ => panic!("⛔️ Invalid argument '{arg}'"),
         },
-        None => {
-            let messages = vec![
-                format!("USER: {}", user.to_str().expect(USER_PANIC)),
-                format!("APP_CACHE_DIR: {cache_dir}"),
-                format!("APP_CONFIG_DIR: {config_dir}"),
-                format!("APP_DATA_DIR: {data_dir}"),
-                format!("APP_LOG_DIR: {log_dir}"),
-            ];
-            menu::ui::print_frame(TITLE, messages, true);
-            menu::show()
-        }
+    );
+}
+
+fn set_envs() {
+    let os = env::consts::OS;
+    let home_dir_os_string = env::var_os("HOME").map_or_else(
+        || {
+            env::var_os("USERPROFILE").map_or_else(
+                || panic!("Unable to determine user's home directory"),
+                |home_dir| home_dir,
+            )
+        },
+        |home_dir| home_dir,
+    );
+
+    let home_dir = home_dir_os_string.to_str().expect("HOME not set");
+    // INFO: Based on tauri path: https://tauri.app/v1/api/js/path/#functions
+    if os == "linux" {
+        env::set_var(
+            "APP_CACHE_DIR",
+            format!("{home_dir}/.cache/{BUNDLE_IDENTIFIER}"),
+        );
+        env::set_var(
+            "APP_CONFIG_DIR",
+            format!("{home_dir}/.config/{BUNDLE_IDENTIFIER}"),
+        );
+        env::set_var(
+            "APP_DATA_DIR",
+            format!("{home_dir}/.local/share/{BUNDLE_IDENTIFIER}"),
+        );
+        env::set_var(
+            "APP_LOG_DIR",
+            format!("{home_dir}/.config/{BUNDLE_IDENTIFIER}/logs"),
+        );
+    } else if os == "macos" {
+        env::set_var(
+            "APP_CACHE_DIR",
+            format!("{home_dir}/Library/Caches/{BUNDLE_IDENTIFIER}"),
+        );
+        env::set_var(
+            "APP_CONFIG_DIR",
+            format!("{home_dir}/Library/Application Support/{BUNDLE_IDENTIFIER}"),
+        );
+        env::set_var(
+            "APP_DATA_DIR",
+            format!("{home_dir}/Library/Application Support/{BUNDLE_IDENTIFIER}"),
+        );
+        env::set_var(
+            "APP_LOG_DIR",
+            format!("{home_dir}/Library/Logs/{BUNDLE_IDENTIFIER}"),
+        );
+    } else {
+        panic!("Unsupported OS");
     }
 }
 
@@ -264,7 +268,7 @@ fn help() {
     menu::ui::print_frame(TITLE, messages, true);
 }
 
-fn handle_daemon(args: Vec<String>) {
+fn handle_daemon(args: &[String]) {
     let arg = args.get(2).expect("⛔️ Missing daemon argument");
     match arg.as_str() {
         "start" => daemon::start(),

@@ -1,7 +1,7 @@
 use super::storage;
 use crate::{daemon, set_state_and_test_connection, Error};
 use back_me_up::models::app::MutexState;
-use back_me_up::{commands, jobs};
+use back_me_up::{commands, graceful_exit, jobs};
 use inquire::InquireError;
 use std::process;
 use std::sync::{Arc, Mutex};
@@ -17,7 +17,7 @@ pub enum Action {
     Exit,
 }
 
-pub fn handle_inquire_error(err: InquireError) {
+pub fn handle_inquire_error(err: &InquireError) {
     match err {
         InquireError::OperationCanceled => (),
         InquireError::OperationInterrupted => process::exit(0),
@@ -77,17 +77,22 @@ pub async fn show() {
     if config.allow_background_backup && !daemon::is_running(&storage) {
         commands::app::start_background_backups(
             &state,
-            storage.backups().expect("could not load backups"),
+            &storage.backups().expect("could not load backups"),
         )
         .expect("could not start background backups");
     }
 
     loop {
-        if let Err(why) = home::show(&state).await {
-            match why {
-                Error::Inquire(err) => handle_inquire_error(err),
-                _ => println!("\n⛔️ Error: {why:?}\n"),
+        match home::show(&state).await {
+            Ok(action) => {
+                if matches!(action, Action::Exit) {
+                    graceful_exit(&state).await;
+                }
             }
+            Err(why) => match why {
+                Error::Inquire(err) => handle_inquire_error(&err),
+                _ => println!("\n⛔️ Error: {why:?}\n"),
+            },
         }
     }
 }

@@ -135,7 +135,7 @@ pub async fn backup_entity(
     backup: Backup,
     state: State<'_, app::MutexState>,
 ) -> Result<String, Error> {
-    Ok(jobs::backup::backup_entity(backup, Arc::new(state.inner())).await?)
+    Ok(jobs::backup::entity_to_server(backup, Arc::new(state.inner())).await?)
 }
 
 #[tauri::command]
@@ -159,7 +159,7 @@ pub fn terminate_background_backup(
     state: State<'_, app::MutexState>,
     backup: Backup,
 ) -> Result<(), Error> {
-    Ok(commands::app::terminate_background_backup(&state, backup)?)
+    Ok(commands::app::terminate_background_backup(&state, &backup)?)
 }
 
 #[tauri::command]
@@ -191,7 +191,7 @@ pub fn start_background_backups(
     state: State<'_, app::MutexState>,
     backups: Vec<Backup>,
 ) -> Result<(), Error> {
-    Ok(commands::app::start_background_backups(&state, backups)?)
+    Ok(commands::app::start_background_backups(&state, &backups)?)
 }
 
 #[tauri::command]
@@ -205,5 +205,5 @@ pub fn check_job_status(
     state: State<'_, app::MutexState>,
     id: String,
 ) -> Result<jobs::Status, Error> {
-    Ok(jobs::check_status(id, &state.jobs, &state.failed_jobs)?)
+    Ok(jobs::check_status(&id, &state.jobs, &state.failed_jobs)?)
 }

@@ -24,9 +24,7 @@ enum BackupMenuItem {
 impl Display for BackupMenuItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BackupMenuItem::Run(text) => write!(f, "{text}"),
-            BackupMenuItem::Delete(text) => write!(f, "{text}"),
-            BackupMenuItem::Back(text) => write!(f, "{text}"),
+            Self::Run(text) | Self::Delete(text) | Self::Back(text) => write!(f, "{text}"),
         }
     }
 }
@@ -39,14 +37,14 @@ enum HandleOrGoBack {
 impl Display for HandleOrGoBack {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            HandleOrGoBack::Handle(backup) => write!(f, "{backup}"),
-            HandleOrGoBack::Back => write!(f, "<-- Back"),
+            Self::Handle(backup) => write!(f, "{backup}"),
+            Self::Back => write!(f, "<-- Back"),
         }
     }
 }
 
 pub async fn handle(state: &MutexState) -> Result<Action, Error> {
-    let backup = match select().await? {
+    let backup = match select()? {
         HandleOrGoBack::Handle(backup) => backup,
         HandleOrGoBack::Back => return Ok(Action::Exit),
     };
@@ -63,7 +61,7 @@ pub async fn handle(state: &MutexState) -> Result<Action, Error> {
 
     match option {
         BackupMenuItem::Run(_) => run(state, backup).await?,
-        BackupMenuItem::Delete(_) => delete(state, backup).await?,
+        BackupMenuItem::Delete(_) => delete(state, &backup)?,
         BackupMenuItem::Back(_) => return Ok(Action::Show),
     };
 
@@ -71,20 +69,24 @@ pub async fn handle(state: &MutexState) -> Result<Action, Error> {
 }
 
 async fn run(state: &MutexState, backup: Backup) -> Result<(), Error> {
-    let id = jobs::backup::backup_entity(backup.clone(), Arc::new(state)).await?;
+    let id = jobs::backup::entity_to_server(backup.clone(), Arc::new(state)).await?;
     print!("\r⏳ Backing up: {id}");
     io::stdout().flush().expect("failed to flush stdout");
     thread::sleep(std::time::Duration::from_secs(1));
-    while let jobs::Status::Running =
-        jobs::check_status(id.clone(), &state.jobs, &state.failed_jobs)?
-    {
+    while matches!(
+        jobs::check_status(&id, &state.jobs, &state.failed_jobs)?,
+        jobs::Status::Running
+    ) {
         thread::sleep(std::time::Duration::from_millis(500));
     }
     println!("\x1B[1A\x1B[2K");
     io::stdout().flush().expect("failed to flush stdout");
 
-    if let jobs::Status::Failed = jobs::check_status(id.clone(), &state.jobs, &state.failed_jobs)? {
-        print!("\r{}", format!("{}", " ".repeat(100))); // removes the loading indicator
+    if matches!(
+        jobs::check_status(&id, &state.jobs, &state.failed_jobs)?,
+        jobs::Status::Failed
+    ) {
+        print!("\r{}", " ".repeat(100)); // removes the loading indicator
         return Err(Error::Job(jobs::Error::Failed(format!(
             "Something went wrong when backing up {}",
             backup.client_location.path
@@ -95,7 +97,7 @@ async fn run(state: &MutexState, backup: Backup) -> Result<(), Error> {
     Ok(())
 }
 
-async fn select() -> Result<HandleOrGoBack, Error> {
+fn select() -> Result<HandleOrGoBack, Error> {
     let storage = storage::Storage::load()?;
     let backups = storage.backups()?;
     let mut options: Vec<HandleOrGoBack> = backups
@@ -153,25 +155,28 @@ pub async fn add(state: &MutexState) -> Result<Action, Error> {
     Ok(Action::Show)
 }
 
-async fn delete(state: &MutexState, backup: Backup) -> Result<(), Error> {
+fn delete(state: &MutexState, backup: &Backup) -> Result<(), Error> {
     let storage = storage::Storage::load()?;
     if let Some(config) = state.config.lock()?.as_ref() {
         if config.allow_background_backup {
-            commands::app::terminate_background_backup(state, backup.clone())?;
+            commands::app::terminate_background_backup(state, backup)?;
         }
     }
     Ok(storage.delete_backup(backup)?)
 }
 
+/// Prompts the user to select a server location. The prompt will list all root folders in the
+/// users home directory.
+///
+/// # Panics
+/// If there is no connection to the server.
 async fn get_server_location(state: &MutexState) -> Result<Location, Error> {
     let connection = state.connection.lock().await;
-    let client = match &connection.as_ref() {
-        Some(connection) => &connection.sftp_client,
-        None => panic!("No connection"),
-    };
-    let config = &state.config.lock()?;
-    let username = if let Some(config) = config.as_ref() {
-        config.username.clone()
+    let connection_ref = connection.as_ref();
+    let client = connection_ref.map_or_else(|| panic!("No connection"), |c| &c.sftp_client);
+    let config = state.config.lock()?.clone();
+    let username = if let Some(config) = config {
+        config.username
     } else {
         return Err(Error::State(String::from("No config detected")));
     };
@@ -213,10 +218,7 @@ fn get_client_location() -> Result<Location, Error> {
 
         path = PathBuf::from(input.trim());
 
-        if !path.is_dir() {
-            error = format!("Invalid path: {path:?}");
-            println!("{error}");
-        } else {
+        if path.is_dir() {
             if !error.is_empty() {
                 print!("\x1B[1A\x1B[2K");
             }
@@ -237,9 +239,10 @@ fn get_client_location() -> Result<Location, Error> {
                 entity_name,
             });
         }
+        error = format!("Invalid path: {path:?}");
     }
 
-    Err(Error::Path(String::from("Could not parse path")))
+    Err(Error::Path(format!("Could not parse path\n{error}")))
 }
 
 fn get_options() -> Result<Options, Error> {

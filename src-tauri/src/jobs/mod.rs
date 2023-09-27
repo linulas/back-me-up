@@ -162,6 +162,7 @@ impl Pool {
         Ok(self.sender.send(Message::New(job))?)
     }
 
+    #[must_use]
     pub fn available_workers(&self) -> usize {
         self.workers.iter().fold(0, |acc, w| {
             if *w.is_available.lock().expect(IS_AVAILABLE_SHOULD_LOCK) {
@@ -342,6 +343,7 @@ impl Worker {
     }
 }
 
+#[must_use]
 pub fn id_from_backup(backup: &Backup, kind: &Kind) -> String {
     match kind {
         Kind::Backup => {
@@ -360,14 +362,14 @@ pub fn id_from_backup(backup: &Backup, kind: &Kind) -> String {
 }
 
 pub fn check_status(
-    id: String,
+    id: &String,
     running_jobs: &Arc<Mutex<Active>>,
     failed_jobs: &Arc<Mutex<Failed>>,
 ) -> Result<Status, Error> {
-    if failed_jobs.lock()?.contains_key(&id) {
+    if failed_jobs.lock()?.contains_key(id) {
         error!("{id}: failed");
         return Ok(Status::Failed);
-    } else if running_jobs.lock()?.contains_key(&id) {
+    } else if running_jobs.lock()?.contains_key(id) {
         return Ok(Status::Running);
     }
 

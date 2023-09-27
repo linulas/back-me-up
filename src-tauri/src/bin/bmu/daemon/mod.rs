@@ -38,7 +38,7 @@ async fn main() {
 
     commands::app::start_background_backups(
         &state,
-        storage.backups().expect("could not load backups"),
+        &storage.backups().expect("could not load backups"),
     )
     .expect("could not start background backups");
 
@@ -72,7 +72,7 @@ pub fn start() {
     let daemonize = Daemonize::new()
         .pid_file(format!("{daemon_dir}/bmu_cli.pid"))
         .chown_pid_file(true)
-        .working_directory(format!("{daemon_dir}"))
+        .working_directory(&daemon_dir)
         .stdout(stdout)
         .stderr(stderr)
         .privileged_action(|| "Executed before drop privileges");
@@ -81,9 +81,10 @@ pub fn start() {
         .config()
         .expect("No config detected, please run 'bmu' to setup");
 
-    if !config.allow_background_backup {
-        panic!("⛔️ Background backups are disabled, please run 'bmu' and go into settings to enable them");
-    }
+    assert!(
+        config.allow_background_backup,
+        "⛔️ Background backups are disabled, please run 'bmu' and go into settings to enable them"
+    );
 
     crate::menu::ui::print_frame(
         "Back me up 🚀",
@@ -105,10 +106,8 @@ pub fn start() {
 pub fn stop() {
     let storage = Storage::load().expect("could not load storage");
     let daemon_dir = storage.daemon_dir.display();
-    let current_state = fs::read_to_string(storage.daemon_dir.join("state"))
-        .expect("Could not read daemon state file");
 
-    if current_state.trim() != "running" {
+    if !is_running(&storage) {
         println!("Daemon is already stopped");
         process::exit(0);
     }
@@ -141,9 +140,10 @@ pub fn restart() {
 
     println!("{}", " ".repeat(50));
 
-    if !is_stopped(&storage) {
-        panic!("⛔️ Could not restart daemon");
-    }
+    assert!(
+        is_stopped(&storage),
+        "⛔️ Daemon is not running, could not restart"
+    );
 
     start();
 }

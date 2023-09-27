@@ -27,6 +27,10 @@ impl Connection {
     }
 }
 
+/// Makes a ssh connection to the specified server
+///
+/// # Panics
+/// If stdout from `whoami` command, which is made after a successful connection, does not match `username` provided in config.
 pub async fn to_server(config: Config, control_directory: PathBuf) -> Result<Session, Error> {
     let user = config.username;
     let host = config.server_address;
@@ -39,7 +43,12 @@ pub async fn to_server(config: Config, control_directory: PathBuf) -> Result<Ses
     info!("Connected as user {user}");
 
     let whoami = session.command("whoami").output().await?;
-    assert_eq!(whoami.stdout, format!("{user}\n").into_bytes());
+    if format!("{user}\n") != String::from_utf8_lossy(&whoami.stdout) {
+        return Err(Error::Command(
+            "The username on the server does not match the username provided in the config"
+                .to_string(),
+        ));
+    }
 
     Ok(session)
 }
