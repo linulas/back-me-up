@@ -16,9 +16,11 @@ jobs:
       - uses: taiki-e/create-gh-release-action@v1
         with:
           draft: true
+          title: CLI v$version
           token: ${{ secrets.GITHUB_TOKEN }}
 
   upload-assets:
+    needs: create-release
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
