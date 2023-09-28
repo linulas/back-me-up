@@ -6,7 +6,7 @@ permissions:
 on:
   push:
     tags:
-      - CLI-[0-9]+.*
+      - v[0-9]+.*-cli
 
 jobs:
   create-release:
