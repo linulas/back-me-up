@@ -1,4 +1,4 @@
-name: 'Tauri - Publish'
+name: Tauri - Publish
 on:
   push:
     branches:
