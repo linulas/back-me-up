@@ -170,7 +170,7 @@ checksum = "d5b3469636cdf8543cceab175efca534471f36eee12fb8374aba00eb5e7e7f8a"
 
 [[package]]
 name = "back_me_up"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "actix-rt",
  "chrono",
