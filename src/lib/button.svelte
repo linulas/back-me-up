@@ -9,10 +9,15 @@
 
 	export let onClick: () => void;
 	export let style = '';
-  export let loadingColor: string = "white";
+	export let loadingColor: string = 'white';
 </script>
 
-<button class={`${type} ${state} ${$clientConfig.theme}`} on:click={onClick} {style}>
+<button
+	class={`${type} ${state} ${$clientConfig.theme}`}
+	on:click={onClick}
+	{style}
+	class:spaceBetween={$$slots['secondary-icon']}
+>
 	<slot />
 	{#if $$slots.icon}
 		<span>
@@ -24,6 +29,7 @@
 				<CheckmarkIcon color="#10b981" />
 			{:else}
 				<slot name="icon" class="icon_slot" />
+				<slot name="secondary-icon" class="icon_slot" />
 			{/if}
 		</span>
 	{/if}
@@ -40,6 +46,10 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+
+		&.spaceBetween {
+			justify-content: space-between;
+		}
 
 		&:hover {
 			transform: scale(1.05);
