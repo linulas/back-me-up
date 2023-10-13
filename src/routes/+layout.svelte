@@ -42,7 +42,7 @@
 </main>
 
 <style lang="scss">
-	@import '../lib/style/mixins.scss';
+	@import '../lib/ui/mixins.scss';
 
 	:global(body) {
 		font-family: $font-sans-serif;

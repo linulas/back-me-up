@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { clientConfig } from './store';
+	import { clientConfig } from '../store';
 
 	interface Item {
 		title: string;

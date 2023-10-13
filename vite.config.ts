@@ -7,13 +7,13 @@ export default defineConfig({
 		Icons({
 			compiler: 'svelte'
 		}),
-		sveltekit()
+		sveltekit(),
 	],
 
 	css: {
 		preprocessorOptions: {
 			scss: {
-				additionalData: `@import "$lib/style/theme.scss";`
+				additionalData: `@import "$lib/ui/theme.scss";`
 			}
 		}
 	}

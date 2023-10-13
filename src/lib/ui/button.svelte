@@ -2,7 +2,7 @@
 	import TadpoleIcon from '~icons/svg-spinners/tadpole';
 	import ErrorIcon from '~icons/ion/alert-circle';
 	import CheckmarkIcon from '~icons/ion/checkmark';
-	import { clientConfig } from './store';
+	import { clientConfig } from '../store';
 
 	export let type: ButtonType = 'primary';
 	export let state: ButtonState = 'idle';
@@ -36,7 +36,7 @@
 </button>
 
 <style lang="scss">
-	@import './style/mixins.scss';
+	@import './mixins.scss';
 	button {
 		@include box;
 		padding: 0.5rem;

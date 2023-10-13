@@ -120,7 +120,7 @@
 </div>
 
 <style lang="scss">
-	@import '../../lib/style/mixins.scss';
+	@import '../../lib/ui/mixins.scss';
 
 	.error {
 		color: $clr-danger;

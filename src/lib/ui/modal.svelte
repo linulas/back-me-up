@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-	import { clientConfig } from './store';
+	import { clientConfig } from '../store';
   
   export let open: boolean;
   function closeModal() {

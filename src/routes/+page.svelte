@@ -10,9 +10,9 @@
 	import ArrowIcon from '~icons/ion/arrow-forward';
 	import TrashIcon from '~icons/ion/trash';
 	import AddIcon from '~icons/ion/add';
-	import Button from '$lib/button.svelte';
-	import Select from '$lib/select.svelte';
-	import Modal from '$lib/modal.svelte';
+	import Button from '$lib/ui/button.svelte';
+	import Select from '$lib/ui/select.svelte';
+	import Modal from '$lib/ui/modal.svelte';
 	import { sleep } from '$lib/concurrency';
 	import { emit, listen } from '@tauri-apps/api/event';
 	import { onUpdaterEvent } from '@tauri-apps/api/updater';
