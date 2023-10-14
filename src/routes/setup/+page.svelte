@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { serverConfig, clientConfig } from '$lib/store';
 	import PlugIcon from '~icons/mdi/plug';
-	import Button from '$lib/button.svelte';
+	import Button from '$lib/ui/button.svelte';
 	import { SERVER_CONFIG_FILE_NAME } from '$lib/app_files';
 	import { invoke } from '@tauri-apps/api/tauri';
 	import { onMount } from 'svelte';
