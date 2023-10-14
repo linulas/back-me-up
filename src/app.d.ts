@@ -4,6 +4,11 @@ declare global {
 
 	type ButtonType = 'primary' | 'secondary' | 'danger' | 'icon' | 'icon-with_background';
 	type ButtonState = 'idle' | 'loading' | 'success' | 'error';
+	type BackupFolderJobType = 'single' | 'reacurring';
+	type BackupFolderJob = {
+		__type: BackupFolderJobType;
+		folder: Folder;
+	};
 
 	namespace App {
     type Theme = 'light' | 'dark';
