@@ -8,6 +8,8 @@
 	import { BaseDirectory, writeTextFile } from '@tauri-apps/api/fs';
 	import { BACKUPS_FILE_NAME } from '$lib/app_files';
 	import ArrowIcon from '~icons/ion/arrow-forward';
+	import CaretDownIcon from '~icons/ion/caret-down';
+	import Reload from '~icons/ion/reload';
 	import TrashIcon from '~icons/ion/trash';
 	import AddIcon from '~icons/ion/add';
 	import Button from '$lib/ui/button.svelte';
@@ -24,12 +26,14 @@
 	import type { JobStatus } from '../../src-tauri/bindings/JobStatus';
 
 	let server_home_folders: Folder[] = [];
-	let new_folder_to_backup: Folder | undefined;
+	let job: BackupFolderJob | undefined;
 	let target_server_folder: string | undefined;
 	let button_states: { [key: string]: ButtonState } = {};
 	let error: App.Error | undefined;
 	let initError: App.Error | undefined;
-  let use_client_directory = false;
+	let use_client_directory = false;
+	let selectMenuOpen = false;
+	let outsideClickListener: (event: MouseEvent) => void;
 
 	$: selectItems = server_home_folders.map((folder) => ({
 		title: folder.name,
@@ -133,8 +137,8 @@
 
 		const backup: Backup = {
 			client_location: {
-				entity_name: new_folder_to_backup!.name,
-				path: new_folder_to_backup!.path
+				entity_name: job!.folder.name,
+				path: job!.folder.path
 			},
 			server_location: { entity_name: server_folder.name, path: server_folder.path },
 			latest_run: null,
@@ -143,12 +147,14 @@
 			}
 		};
 
-		new_folder_to_backup = undefined;
-		target_server_folder = undefined;
-    use_client_directory = false;
+		if (job?.__type === 'reacurring') {
+			backups.update((currentState) => [...currentState, backup]);
+			emit('backups-updated', $backups);
+		}
 
-		backups.update((currentState) => [...currentState, backup]);
-		emit('backups-updated', $backups);
+		job = undefined;
+		target_server_folder = undefined;
+		use_client_directory = false;
 
 		if (!(await backupDirectory(backup))) {
 			error = {
@@ -180,7 +186,7 @@
 		}
 	};
 
-	const selectNewFolderToBackup = async () => {
+	const selectNewFolderToBackup = async (jobType: BackupFolderJobType) => {
 		const local_folder_path = await open({
 			multiple: false,
 			title: 'Select a folder',
@@ -189,10 +195,13 @@
 
 		if (!local_folder_path || Array.isArray(local_folder_path)) return;
 
-		new_folder_to_backup = {
-			name: extractFileNameFromPath(local_folder_path),
-			path: local_folder_path,
-			size: null
+		job = {
+			__type: jobType,
+			folder: {
+				name: extractFileNameFromPath(local_folder_path),
+				path: local_folder_path,
+				size: null
+			}
 		};
 	};
 
@@ -206,7 +215,25 @@
 			});
 	};
 
-	onMount(loadConfig);
+	const toggleSelectMenuOpen = () => {
+		selectMenuOpen = !selectMenuOpen;
+		if (selectMenuOpen) {
+			window.addEventListener('click', outsideClickListener);
+		} else {
+			window.removeEventListener('click', outsideClickListener);
+		}
+	};
+
+	onMount(() => {
+		outsideClickListener = (event: MouseEvent) => {
+			const target = event.target as HTMLElement;
+			if (!target.closest('.select') || target.closest('.menu')) {
+				selectMenuOpen = false;
+				window.removeEventListener('click', outsideClickListener);
+			}
+		};
+		loadConfig();
+	});
 	onDestroy(async () => {
 		(await unlistenReset)();
 		(await unlistenRefreshServerConfig)();
@@ -216,7 +243,7 @@
 
 {#if !initError && $serverConfig?.server_address}
 	<div class={$clientConfig.theme}>
-		<Modal open={new_folder_to_backup !== undefined}>
+		<Modal open={job !== undefined}>
 			<div class="modal">
 				<div class="form_group">
 					<label for="server_home_folders">Select target folder on the server</label>
@@ -236,10 +263,24 @@
 		</Modal>
 		<div class="heading">
 			<h1>Your backups</h1>
-			<div>
-				<Button type="primary" onClick={selectNewFolderToBackup}>
-					New <AddIcon slot="icon" />
+			<div class="select">
+				<Button type="primary" onClick={toggleSelectMenuOpen} style="min-width: 8rem;">
+					<div class="button-text">New</div>
+					<AddIcon slot="icon" />
+					<CaretDownIcon
+						slot="secondary-icon"
+						style={`transform: rotate(${selectMenuOpen ? 180 : 0}deg);`}
+					/>
 				</Button>
+				{#if selectMenuOpen}
+					<div class="menu">
+						<button on:click={() => selectNewFolderToBackup('reacurring')}
+							><Reload />Reacurring</button
+						>
+						<button on:click={() => selectNewFolderToBackup('single')}><ArrowIcon />One time</button
+						>
+					</div>
+				{/if}
 			</div>
 		</div>
 		{#if error}
@@ -300,6 +341,40 @@
 		align-items: center;
 	}
 
+	.select {
+		position: relative;
+
+		.button-text {
+			margin-left: 0.5rem;
+		}
+
+		.menu {
+			@include box;
+			position: absolute;
+			bottom: -5.5rem;
+			left: 0;
+			display: flex;
+			flex-direction: column;
+			gap: 0.125rem;
+			background-color: $clr-foreground;
+			padding: 0.5rem;
+
+			button {
+				border: none;
+				background-color: transparent;
+				text-align: left;
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				padding: 0.225rem;
+				cursor: pointer;
+				&:hover {
+					background-color: $slate-300;
+				}
+			}
+		}
+	}
+
 	.error {
 		color: $clr-danger;
 	}
@@ -355,6 +430,18 @@
 	.dark {
 		.backup {
 			border-color: $clr-border_dark;
+		}
+		.select {
+			.menu {
+				background-color: $clr-secondary-action_dark;
+
+				button {
+					color: $clr-text_light;
+					&:hover {
+						background-color: $clr-secondary-action_hover_dark;
+					}
+				}
+			}
 		}
 	}
 </style>
