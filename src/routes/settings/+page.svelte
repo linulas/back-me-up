@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { BACKUPS_FILE_NAME, SERVER_CONFIG_FILE_NAME } from '$lib/app_files';
-	import Button from '$lib/button.svelte';
+	import Button from '$lib/ui/button.svelte';
 	import { backups, clientConfig, serverConfig } from '$lib/store';
 	import { BaseDirectory, removeFile, writeTextFile } from '@tauri-apps/api/fs';
 	import { invoke } from '@tauri-apps/api/tauri';
