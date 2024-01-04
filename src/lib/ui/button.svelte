@@ -4,6 +4,7 @@
 
 	export let type: ButtonType = 'primary';
 	export let state: ButtonState = 'idle';
+  export let disabled = false;
 
 	export let onClick: () => void;
 	export let style = '';
@@ -14,7 +15,9 @@
 	class={`${type} ${state} ${$clientConfig.theme}`}
 	on:click={onClick}
 	{style}
+  {disabled}
 	class:spaceBetween={$$slots['secondary-icon']}
+  class:disabled
 >
 	<slot />
 	{#if $$slots.icon}
@@ -54,6 +57,14 @@
 			transform: scale(1.1);
 		}
 	}
+
+  .disabled {
+    &:hover {
+      transform: none;
+      cursor: not-allowed;
+    }
+  }
+
 	span {
 		margin-top: 6px;
 	}
