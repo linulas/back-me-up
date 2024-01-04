@@ -1,8 +1,6 @@
 <script lang="ts">
-	import TadpoleIcon from '~icons/svg-spinners/tadpole';
-	import ErrorIcon from '~icons/ion/alert-circle';
-	import CheckmarkIcon from '~icons/ion/checkmark';
 	import { clientConfig } from '../store';
+	import LoadingState from './loading_state.svelte';
 
 	export let type: ButtonType = 'primary';
 	export let state: ButtonState = 'idle';
@@ -21,16 +19,10 @@
 	<slot />
 	{#if $$slots.icon}
 		<span>
-			{#if state === 'loading'}
-				<TadpoleIcon color={loadingColor} />
-			{:else if state === 'error'}
-				<ErrorIcon color="#ef4444" />
-			{:else if state === 'success'}
-				<CheckmarkIcon color="#10b981" />
-			{:else}
-				<slot name="icon" class="icon_slot" />
-				<slot name="secondary-icon" class="icon_slot" />
-			{/if}
+      <LoadingState {state} {loadingColor}>
+				<slot name="icon" slot="icon" class="icon_slot" />
+				<slot name="secondary-icon" slot="secondary-icon" class="icon_slot" />
+      </LoadingState>
 		</span>
 	{/if}
 </button>
