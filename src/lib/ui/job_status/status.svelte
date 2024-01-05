@@ -14,17 +14,19 @@
 	export let failedJobs: App.Job[] = [];
 	export let onClear: () => void = () => {};
 
-	let show = jobs.length > 0 || completedJobs.length > 0 || failedJobs.length > 0;
+	let show = false;
 	let state: ButtonState = 'idle';
 	let expanded = false;
 
+  const filter = (j: App.Job) => j.__type === 'single';
+
 	$: iconColor = $clientConfig.theme === 'dark' ? 'white' : 'black';
-	$: jobs.length > 0 && (state = 'loading');
+	$: jobs.filter(filter).length > 0 && (state = 'loading');
 	$: state === 'idle' ? (show = false) : (show = true);
-	$: if (jobs.length === 0) {
-		if (completedJobs.length > 0 && failedJobs.length == 0) {
+	$: if (jobs.filter(filter).length === 0) {
+		if (completedJobs.some(filter) && failedJobs.length == 0) {
 			state = 'success';
-		} else if (failedJobs.length > 0) {
+		} else if (failedJobs.some(filter)) {
 			state = 'error';
 		}
 	}
@@ -73,13 +75,13 @@
 			</span>
 			<span class="text">
 				{#if jobs.length > 0}
-					Running jobs: {jobs.length}
+					Running jobs: {jobs.filter(filter).length}
 				{:else}
 					<span>
-						Failed jobs: {failedJobs.length}
+						Failed jobs: {failedJobs.filter(filter).length}
 					</span>
 					<span>
-						Completed jobs: {completedJobs.length}
+						Completed jobs: {completedJobs.filter(filter).length}
 					</span>
 				{/if}
 			</span>
