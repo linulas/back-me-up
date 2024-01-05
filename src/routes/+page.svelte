@@ -7,6 +7,11 @@
 	import { backups, clientConfig, clientDefaults, serverConfig } from '$lib/store';
 	import { BaseDirectory, writeTextFile } from '@tauri-apps/api/fs';
 	import { BACKUPS_FILE_NAME } from '$lib/app_files';
+	import { sleep } from '$lib/concurrency';
+	import { emit, listen } from '@tauri-apps/api/event';
+	import { onUpdaterEvent } from '@tauri-apps/api/updater';
+	import { info, error as logError } from 'tauri-plugin-log-api';
+	import { randomString } from '$lib/generate';
 	import ArrowIcon from '~icons/ion/arrow-forward';
 	import CaretDownIcon from '~icons/ion/caret-down';
 	import Reload from '~icons/ion/reload';
@@ -15,10 +20,7 @@
 	import Button from '$lib/ui/button.svelte';
 	import Select from '$lib/ui/select.svelte';
 	import Modal from '$lib/ui/modal.svelte';
-	import { sleep } from '$lib/concurrency';
-	import { emit, listen } from '@tauri-apps/api/event';
-	import { onUpdaterEvent } from '@tauri-apps/api/updater';
-	import { info, error as logError } from 'tauri-plugin-log-api';
+	import JobStatusPopup from '$lib/ui/job_status/status.svelte';
 
 	import type { Folder } from '../../src-tauri/bindings/Folder';
 	import type { Backup } from '../../src-tauri/bindings/Backup';
@@ -26,7 +28,10 @@
 	import type { JobStatus } from '../../src-tauri/bindings/JobStatus';
 
 	let server_home_folders: Folder[] = [];
-	let job: BackupFolderJob | undefined;
+	let incomingJob: App.BackupFolderJob | undefined;
+	let jobs: App.Job[] = [];
+	let completedJobs: App.Job[] = [];
+	let failedJobs: App.Job[] = [];
 	let target_server_folder: string | undefined;
 	let button_states: { [key: string]: ButtonState } = {};
 	let error: App.Error | undefined;
@@ -98,7 +103,7 @@
 		}
 	});
 
-	const backupDirectory = async (backup: Backup) => {
+	const backupDirectory = async (backup: Backup): Promise<boolean> => {
 		const buttonStateKey = `${backup.client_location.entity_name}_${backup.server_location.entity_name}`;
 		button_states[buttonStateKey] = 'loading';
 		try {
@@ -106,16 +111,17 @@
 			let status = await invoke<JobStatus>('check_job_status', { id: jobId });
 
 			while (status === 'Running') {
-				await sleep(1500);
+				await sleep(3000);
 				status = await invoke<JobStatus>('check_job_status', { id: jobId });
 			}
 
 			if (status === 'Completed') {
 				button_states[buttonStateKey] = 'success';
+				return true;
 			} else {
 				button_states[buttonStateKey] = 'error';
+				return false;
 			}
-			return true;
 		} catch (e) {
 			console.error(e);
 			button_states[buttonStateKey] = 'error';
@@ -123,22 +129,49 @@
 		}
 	};
 
-	const addNewBackup = async () => {
+	const addNewJob = async () => {
+		if (!incomingJob?.from?.path) {
+			error = {
+				message: `Cannot add backup with the provided parameter: Local folder - ${incomingJob?.from?.path}`
+			};
+			return;
+		}
+
 		const server_folder = server_home_folders.find(
 			(folder) => folder.name === target_server_folder
 		);
 
 		if (!server_folder) {
+			error = { message: `Server folder not found: ${target_server_folder}` };
+			return;
+		}
+
+		incomingJob.to = server_folder;
+
+		if (
+			jobs.some(
+				(job: App.BackupFolderJob) =>
+					job.from?.path === incomingJob?.from?.path && job.to?.path === incomingJob?.to?.path
+			) ||
+			$backups.some(
+				(b) =>
+					b.client_location.path === incomingJob?.from?.path &&
+					b.server_location.path === server_folder.path
+			)
+		) {
 			error = {
-				message: 'Server folder not found'
+				message: `Backup already exists: ${incomingJob.from.path}`
 			};
+			incomingJob = undefined;
+			target_server_folder = undefined;
+			use_client_directory = false;
 			return;
 		}
 
 		const backup: Backup = {
 			client_location: {
-				entity_name: job!.folder.name,
-				path: job!.folder.path
+				entity_name: incomingJob.from.name,
+				path: incomingJob.from.path
 			},
 			server_location: { entity_name: server_folder.name, path: server_folder.path },
 			latest_run: null,
@@ -147,21 +180,31 @@
 			}
 		};
 
-		if (job?.__type === 'reacurring') {
+		const task = async (): Promise<void> => {
+			const job = incomingJob as App.BackupFolderJob;
+			if (!(await backupDirectory(backup))) {
+        failedJobs = [...failedJobs, job];
+				error = {
+					message: `Failed to backup ${backup.client_location.path}`
+				};
+			} else {
+        completedJobs = [...completedJobs, job];
+      }
+
+      jobs = jobs.filter((j) => j.id !== job.id);
+		};
+
+		incomingJob.task = task();
+		jobs = [...jobs, incomingJob];
+
+		if (incomingJob.__type == 'reacurring') {
 			backups.update((currentState) => [...currentState, backup]);
 			emit('backups-updated', $backups);
 		}
 
-		job = undefined;
+		incomingJob = undefined;
 		target_server_folder = undefined;
 		use_client_directory = false;
-
-		if (!(await backupDirectory(backup))) {
-			error = {
-				message: `Failed to backup ${backup.client_location.entity_name}`
-			};
-			return;
-		}
 	};
 
 	const deleteBackup = async (backup: Backup) => {
@@ -195,9 +238,11 @@
 
 		if (!local_folder_path || Array.isArray(local_folder_path)) return;
 
-		job = {
+		incomingJob = {
 			__type: jobType,
-			folder: {
+			id: randomString(16),
+			state: 'loading',
+			from: {
 				name: extractFileNameFromPath(local_folder_path),
 				path: local_folder_path,
 				size: null
@@ -238,12 +283,13 @@
 		(await unlistenReset)();
 		(await unlistenRefreshServerConfig)();
 		(await unlistenUpdater)();
+		outsideClickListener = () => {};
 	});
 </script>
 
 {#if !initError && $serverConfig?.server_address}
 	<div class={$clientConfig.theme}>
-		<Modal open={job !== undefined}>
+		<Modal open={incomingJob !== undefined}>
 			<div class="modal">
 				<div class="form_group">
 					<label for="server_home_folders">Select target folder on the server</label>
@@ -258,7 +304,7 @@
 						on:change={() => (use_client_directory = !use_client_directory)}
 					/>
 				</div>
-				<Button type="secondary" onClick={addNewBackup}>Backup</Button>
+				<Button type="secondary" onClick={addNewJob}>Backup</Button>
 			</div>
 		</Modal>
 		<div class="heading">
@@ -274,9 +320,9 @@
 				</Button>
 				{#if selectMenuOpen}
 					<div class="menu">
-						<button on:click={() => selectNewFolderToBackup('reacurring')}
-							><Reload />Reacurring</button
-						>
+						<button on:click={() => selectNewFolderToBackup('reacurring')}>
+							<Reload />Reacurring
+						</button>
 						<button on:click={() => selectNewFolderToBackup('single')}><ArrowIcon />One time</button
 						>
 					</div>
@@ -328,6 +374,16 @@
 		{:else}
 			<div>No backups</div>
 		{/if}
+		<JobStatusPopup
+			{jobs}
+			{completedJobs}
+			{failedJobs}
+			onClear={() => {
+				jobs = [];
+				completedJobs = [];
+				failedJobs = [];
+			}}
+		/>
 	</div>
 {:else if initError}
 	<h1>Internal server error</h1>
