@@ -334,11 +334,10 @@
 		{/if}
 		{#if $backups.length > 0}
 			<div class="backups">
-				<div class="grid grid-heading">
+				<div class="grid-heading">
 					<div>
 						<div>Local folder</div>
 					</div>
-					<div />
 					<div>
 						<div>Server folder</div>
 					</div>
@@ -447,6 +446,8 @@
 		font-weight: bold;
 		font-size: 1.2rem;
 		margin-bottom: 0.5rem;
+		display: grid;
+		grid-template-columns: 0.9fr 1fr;
 	}
 
 	.grid {
