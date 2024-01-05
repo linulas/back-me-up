@@ -1,15 +1,11 @@
 <script lang="ts">
 	import ArrowIcon from '~icons/ion/arrow-forward';
 	import { clientConfig } from '$lib/store';
-	export let job: App.Job;
-
-	const isBackupFolderJob = (job: App.Job): job is App.BackupFolderJob => {
-		return (job as any).from !== undefined && (job as any).to !== undefined;
-	};
+	export let job: App.BackupFolderJob;
 </script>
 
 <div class="item">
-	{#if isBackupFolderJob(job)}
+	{#if job.__type === 'single'}
 		<span>
 			<slot />
 		</span>
