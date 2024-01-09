@@ -8,7 +8,7 @@
 	import { BaseDirectory, writeTextFile } from '@tauri-apps/api/fs';
 	import { BACKUPS_FILE_NAME } from '$lib/app_files';
 	import { sleep } from '$lib/concurrency';
-	import { emit, listen } from '@tauri-apps/api/event';
+	import { TauriEvent, emit, listen } from '@tauri-apps/api/event';
 	import { onUpdaterEvent } from '@tauri-apps/api/updater';
 	import { info, error as logError } from 'tauri-plugin-log-api';
 	import { randomString } from '$lib/generate';
@@ -17,6 +17,8 @@
 	import Reload from '~icons/ion/reload';
 	import TrashIcon from '~icons/ion/trash';
 	import AddIcon from '~icons/ion/add';
+	import UploadIcon from '~icons/ion/cloud-upload-outline';
+	import NotSupportedIcon from '~icons/ion/cloud-offline-outline';
 	import Button from '$lib/ui/button.svelte';
 	import Select from '$lib/ui/select.svelte';
 	import Modal from '$lib/ui/modal.svelte';
@@ -39,11 +41,16 @@
 	let use_client_directory = false;
 	let selectMenuOpen = false;
 	let outsideClickListener: (event: MouseEvent) => void;
+	let hovering = false;
+	let selectServerFolderModalOpen = false;
+	let hasDirectoryInDropPayload = false;
 
 	$: selectItems = server_home_folders.map((folder) => ({
 		title: folder.name,
 		value: folder.name
 	}));
+
+	$: selectServerFolderModalOpen = incomingJob !== undefined;
 
 	$: $backups.length > 0 &&
 		writeTextFile(BACKUPS_FILE_NAME, JSON.stringify($backups), {
@@ -103,6 +110,91 @@
 		}
 	});
 
+	const triggerServerFolderModalAndAwaitSelection = async () => {
+		selectServerFolderModalOpen = true;
+		while (selectServerFolderModalOpen) {
+			await sleep(100);
+		}
+	};
+
+	const unlistenFileDropEvent = listen<TauriEvent>(TauriEvent.WINDOW_FILE_DROP, async (event) => {
+		hovering = false;
+		if (!hasDirectoryInDropPayload) return;
+		const files: string[] = (event as any).payload;
+		const notSupportedFiles: String[] = [];
+		if (files.length === 0) return;
+
+		await triggerServerFolderModalAndAwaitSelection();
+
+		if (!target_server_folder) {
+			hasDirectoryInDropPayload = false;
+			return;
+		}
+
+		const target = target_server_folder;
+
+		const checkedIfFilesAreSupported = files.map(async (file) => {
+			let job: App.BackupFolderJob = {
+				__type: 'single',
+				id: randomString(16),
+				state: 'loading',
+				from: {
+					name: extractFileNameFromPath(file),
+					path: file,
+					size: null
+				}
+			};
+
+			try {
+				const isDirectory = await invoke<boolean>('is_directory', { path: file });
+
+				if (!isDirectory) {
+					notSupportedFiles.push(file);
+					return;
+				}
+
+				addNewJob(job, target);
+			} catch (e: any) {
+				job.state = 'error';
+				failedJobs = [...failedJobs, job];
+				error = { message: e };
+			}
+		});
+
+		hasDirectoryInDropPayload = false;
+
+    await Promise.all(checkedIfFilesAreSupported);
+
+		if (notSupportedFiles.length > 0) {
+			error = {
+				message: `The following files are not supported: ${notSupportedFiles.join(', ')}`
+			};
+		}
+	});
+
+	const unlistenFileHoverEvent = listen<TauriEvent>(
+		TauriEvent.WINDOW_FILE_DROP_HOVER,
+		async (event) => {
+			hasDirectoryInDropPayload = false;
+			hovering = true;
+			const files: string[] = (event as any).payload;
+			for (const file of files) {
+				if (hasDirectoryInDropPayload) break;
+				try {
+					const isDirectory = await invoke<boolean>('is_directory', { path: file });
+					hasDirectoryInDropPayload = isDirectory;
+				} catch (e: any) {
+					error = { message: e };
+				}
+			}
+		}
+	);
+
+	const unlistenFileCancelEvent = listen(TauriEvent.WINDOW_FILE_DROP_CANCELLED, (event) => {
+		hovering = false;
+		hasDirectoryInDropPayload = false;
+	});
+
 	const backupDirectory = async (backup: Backup): Promise<boolean> => {
 		const buttonStateKey = `${backup.client_location.entity_name}_${backup.server_location.entity_name}`;
 		button_states[buttonStateKey] = 'loading';
@@ -129,38 +221,38 @@
 		}
 	};
 
-	const addNewJob = async () => {
-		if (!incomingJob?.from?.path) {
+	const addNewJob = async (incoming?: App.BackupFolderJob, target?: string) => {
+		if (!incoming?.from?.path) {
+			selectServerFolderModalOpen = false;
 			error = {
-				message: `Cannot add backup with the provided parameter: Local folder - ${incomingJob?.from?.path}`
+				message: `Cannot add backup with the provided parameter: Local folder - ${incoming?.from?.path}`
 			};
 			return;
 		}
 
-		const server_folder = server_home_folders.find(
-			(folder) => folder.name === target_server_folder
-		);
+		const server_folder = server_home_folders.find((folder) => folder.name === target);
 
 		if (!server_folder) {
-			error = { message: `Server folder not found: ${target_server_folder}` };
+			selectServerFolderModalOpen = false;
+			error = { message: `Server folder not found: ${target}` };
 			return;
 		}
 
-		incomingJob.to = server_folder;
+		incoming.to = server_folder;
 
 		if (
 			jobs.some(
 				(job: App.BackupFolderJob) =>
-					job.from?.path === incomingJob?.from?.path && job.to?.path === incomingJob?.to?.path
+					job.from?.path === incoming?.from?.path && job.to?.path === incoming?.to?.path
 			) ||
 			$backups.some(
 				(b) =>
-					b.client_location.path === incomingJob?.from?.path &&
+					b.client_location.path === incoming?.from?.path &&
 					b.server_location.path === server_folder.path
 			)
 		) {
 			error = {
-				message: `Backup already exists: ${incomingJob.from.path}`
+				message: `Backup already exists: ${incoming.from.path}`
 			};
 			incomingJob = undefined;
 			target_server_folder = undefined;
@@ -170,8 +262,8 @@
 
 		const backup: Backup = {
 			client_location: {
-				entity_name: incomingJob.from.name,
-				path: incomingJob.from.path
+				entity_name: incoming.from.name,
+				path: incoming.from.path
 			},
 			server_location: { entity_name: server_folder.name, path: server_folder.path },
 			latest_run: null,
@@ -181,23 +273,23 @@
 		};
 
 		const task = async (): Promise<void> => {
-			const job = incomingJob as App.BackupFolderJob;
+			const job = incoming as App.BackupFolderJob;
 			if (!(await backupDirectory(backup))) {
-        failedJobs = [...failedJobs, job];
+				failedJobs = [...failedJobs, job];
 				error = {
 					message: `Failed to backup ${backup.client_location.path}`
 				};
 			} else {
-        completedJobs = [...completedJobs, job];
-      }
+				completedJobs = [...completedJobs, job];
+			}
 
-      jobs = jobs.filter((j) => j.id !== job.id);
+			jobs = jobs.filter((j) => j.id !== job.id);
 		};
 
-		incomingJob.task = task();
-		jobs = [...jobs, incomingJob];
+		incoming.task = task();
+		jobs = [...jobs, incoming];
 
-		if (incomingJob.__type == 'reacurring') {
+		if (incoming.__type == 'reacurring') {
 			backups.update((currentState) => [...currentState, backup]);
 			emit('backups-updated', $backups);
 		}
@@ -283,13 +375,36 @@
 		(await unlistenReset)();
 		(await unlistenRefreshServerConfig)();
 		(await unlistenUpdater)();
+		(await unlistenFileDropEvent)();
+		(await unlistenFileHoverEvent)();
+		(await unlistenFileCancelEvent)();
 		outsideClickListener = () => {};
 	});
 </script>
 
 {#if !initError && $serverConfig?.server_address}
+	<div class={`file_drop_zone ${$clientConfig.theme}`} class:hovering>
+		{#if hasDirectoryInDropPayload}
+			<div class="feedback">
+				<span>
+					<UploadIcon style="font-size: 6rem" />
+					<p>Drop folder here to backup</p>
+				</span>
+			</div>
+		{:else}
+			<div class="feedback">
+				<span>
+					<NotSupportedIcon style="font-size: 6rem" color="var(--clr-danger)" />
+					<p>Single file is upload not supported at the moment, please select a folder</p>
+				</span>
+			</div>
+		{/if}
+	</div>
 	<div class={$clientConfig.theme}>
-		<Modal open={incomingJob !== undefined}>
+		<Modal
+			bind:open={selectServerFolderModalOpen}
+			onClickOutside={() => (target_server_folder = undefined)}
+		>
 			<div class="modal">
 				<div class="form_group">
 					<label for="server_home_folders">Select target folder on the server</label>
@@ -304,7 +419,15 @@
 						on:change={() => (use_client_directory = !use_client_directory)}
 					/>
 				</div>
-				<Button type="secondary" onClick={addNewJob}>Backup</Button>
+				<Button
+					type="secondary"
+					onClick={() =>
+						!incomingJob
+							? (selectServerFolderModalOpen = false)
+							: addNewJob(incomingJob, target_server_folder)}
+				>
+					Backup
+				</Button>
 			</div>
 		</Modal>
 		<div class="heading">
@@ -348,7 +471,7 @@
 						<div class="folder">
 							<div>
 								<Button type="icon" onClick={() => deleteBackup(backup)} style="padding-left: 0">
-									<TrashIcon color="#ef4444" />
+									<TrashIcon color="var(--clr-danger)" />
 								</Button>
 								<span>
 									{backup.client_location.entity_name}
@@ -396,6 +519,48 @@
 		align-items: center;
 	}
 
+	.file_drop_zone {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 100vh;
+		backdrop-filter: blur(10px);
+		background-color: rgba(130, 130, 130, 0.5);
+		z-index: 10;
+		display: none;
+		justify-content: center;
+		align-items: center;
+
+		&.hovering {
+			display: flex;
+		}
+
+		.feedback,
+		.feedback span {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.feedback {
+			@include box;
+			background: $clr-background;
+			padding: 1rem;
+			width: 75vw;
+			height: 30vh;
+			gap: 0.5rem;
+
+			span {
+				border: 1px dashed $slate-400;
+				width: 100%;
+				height: 100%;
+				border-radius: 0.5rem;
+			}
+		}
+	}
+
 	.select {
 		position: relative;
 
@@ -413,6 +578,7 @@
 			gap: 0.125rem;
 			background-color: $clr-foreground;
 			padding: 0.5rem;
+			z-index: 0;
 
 			button {
 				border: none;
@@ -485,6 +651,12 @@
 	}
 
 	.dark {
+		.feedback {
+			background: $clr-background_dark;
+			span {
+				border: 1px dashed $slate-500;
+			}
+		}
 		.backup {
 			border-color: $clr-border_dark;
 		}
