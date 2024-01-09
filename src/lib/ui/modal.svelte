@@ -3,9 +3,17 @@
 	import { clientConfig } from '../store';
   
   export let open: boolean;
+  export let onClickOutside: () => void = () => {};
+
   function closeModal() {
     open = false;
   }
+
+  function handleClickOutside(){
+    onClickOutside();
+    closeModal();
+  }
+
   onMount(() => {
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
@@ -17,7 +25,7 @@
 {#if open}
   <div class={`modal ${$clientConfig.theme}`}>
     <!-- svelte-ignore a11y-click-events-have-key-events -->
-    <div class="overlay" on:click={closeModal}></div>
+    <div class="overlay" on:click={handleClickOutside}></div>
     <div class="content">
       <slot />
     </div>
