@@ -24,6 +24,31 @@ $clr-foreground_dark: $slate-700;
 $clr-secondary-action_dark: $slate-700;
 $clr-secondary-action_hover_dark: $slate-600;
 
+:root {
+  // Shared colors
+  --clr-primary-action: #{$clr-primary-action};
+  --clr-primary-action_hover: #{$clr-primary-action_hover};
+  --clr-danger: #{$clr-danger};
+  --clr-warning: #{$clr-warning};
+  --clr-success: #{$clr-success};
+  --clr-text_light: #{$clr-text_light};
+  --clr-text_dark: #{$clr-text_dark};
+
+  // Light theme
+  --clr-background: #{$clr-background};
+  --clr-foreground: #{$clr-foreground};
+  --clr-border: #{$clr-border};
+  --clr-secondary-action: #{$clr-secondary-action};
+  --clr-secondary-action_hover: #{$clr-secondary-action_hover};
+
+  // Dark theme
+  --clr-background_dark: #{$clr-background_dark};
+  --clr-foreground_dark: #{$clr-foreground_dark};
+  --clr-border_dark: #{$clr-border_dark};
+  --clr-secondary-action_dark: #{$clr-secondary-action_dark};
+  --clr-secondary-action_hover_dark: #{$clr-secondary-action_hover_dark};
+}
+
 // Fonts
 $font-sans-serif: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif,
 	'Apple Color Emoji', 'Segoe UI Emoji';
