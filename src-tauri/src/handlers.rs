@@ -207,3 +207,9 @@ pub fn check_job_status(
 ) -> Result<jobs::Status, Error> {
     Ok(jobs::check_status(&id, &state.jobs, &state.failed_jobs)?)
 }
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn is_directory(path: String) -> Result<bool, Error> {
+    Ok(commands::os::is_directory(&path)?)
+}

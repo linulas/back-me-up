@@ -107,7 +107,8 @@ fn main() {
             handlers::drop_pool,
             handlers::reset,
             handlers::get_client_name,
-            handlers::check_job_status
+            handlers::check_job_status,
+            handlers::is_directory
         ])
         .system_tray(app_tray)
         .on_system_tray_event(tray::handle_system_tray_event)

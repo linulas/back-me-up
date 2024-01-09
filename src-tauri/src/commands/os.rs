@@ -82,6 +82,10 @@ pub fn directory_exists(path: &str) -> bool {
     fs::metadata(path).is_ok()
 }
 
+pub fn is_directory(path: &str) -> Result<bool, Error> {
+    Ok(fs::metadata(path)?.is_dir())
+}
+
 pub fn create_directory(path: &str) -> Result<(), Error> {
     fs::create_dir(path)?;
     Ok(())
