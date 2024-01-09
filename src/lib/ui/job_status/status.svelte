@@ -18,9 +18,9 @@
 	let state: ButtonState = 'idle';
 	let expanded = false;
 
-  const filter = (j: App.Job) => j.__type === 'single';
+	const filter = (j: App.Job) => j.__type === 'single';
 
-	$: iconColor = $clientConfig.theme === 'dark' ? 'white' : 'black';
+	$: iconColor = $clientConfig.theme === 'dark' ? 'var(--clr-text_light)' : 'var(--clr-text_dark)';
 	$: jobs.filter(filter).length > 0 && (state = 'loading');
 	$: state === 'idle' ? (show = false) : (show = true);
 	$: if (jobs.filter(filter).length === 0) {
@@ -58,12 +58,12 @@
 				{/each}
 				{#each failedJobs as job}
 					<Item {job}>
-						<ErrorIcon color="#ef4444" />
+						<ErrorIcon color="var(--clr-danger)" />
 					</Item>
 				{/each}
 				{#each completedJobs as job}
 					<Item {job}>
-						<CheckmarkIcon color="#10b981" />
+						<CheckmarkIcon color="var(--clr-success)" />
 					</Item>
 				{/each}
 			</div>
