@@ -161,6 +161,7 @@ fn exec_backup_command(
         None => return Ok(()),
     };
 
+    // TODO: add config option to ignore or include hidden
     if path
         .file_stem()
         .unwrap_or_default()
@@ -172,7 +173,7 @@ fn exec_backup_command(
         return Ok(());
     }
 
-    let ignore_extentions = vec!["sb"];
+    let ignore_extentions = vec!["sb"]; // TODO: make configurable
 
     if ignore_extentions.contains(
         &path
@@ -317,7 +318,10 @@ pub fn terminate_all<S: ::std::hash::BuildHasher>(
     jobs.clear();
 }
 
-pub async fn entity_to_server(mut backup: Backup, state: Arc<&MutexState>) -> Result<String, Error> {
+pub async fn entity_to_server(
+    mut backup: Backup,
+    state: Arc<&MutexState>,
+) -> Result<String, Error> {
     let config_mutex = state.config.lock()?.clone();
     let config = match config_mutex {
         Some(config) => config.clone(),
@@ -359,7 +363,10 @@ pub async fn entity_to_server(mut backup: Backup, state: Arc<&MutexState>) -> Re
             .expect("Could not lock jobs")
             .insert(job_id.clone(), worker.id);
 
-        match ssh::commands::backup_to_server(&backup, &config, true) {
+        let is_directory = crate::commands::os::is_directory(&backup.client_location.path)
+            .expect("Could not check if path is directory");
+
+        match ssh::commands::backup_to_server(&backup, &config, is_directory) {
             Ok(_) => {
                 jobs.lock().expect("Could not lock jobs").remove(&job_id);
             }
