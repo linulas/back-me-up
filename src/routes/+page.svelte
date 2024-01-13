@@ -18,7 +18,6 @@
 	import TrashIcon from '~icons/ion/trash';
 	import AddIcon from '~icons/ion/add';
 	import UploadIcon from '~icons/ion/cloud-upload-outline';
-	import NotSupportedIcon from '~icons/ion/cloud-offline-outline';
 	import Button from '$lib/ui/button.svelte';
 	import Select from '$lib/ui/select.svelte';
 	import Modal from '$lib/ui/modal.svelte';
@@ -43,7 +42,6 @@
 	let outsideClickListener: (event: MouseEvent) => void;
 	let hovering = false;
 	let selectServerFolderModalOpen = false;
-	let hasDirectoryInDropPayload = false;
 
 	$: selectItems = server_home_folders.map((folder) => ({
 		title: folder.name,
@@ -119,23 +117,20 @@
 
 	const unlistenFileDropEvent = listen<TauriEvent>(TauriEvent.WINDOW_FILE_DROP, async (event) => {
 		hovering = false;
-		if (!hasDirectoryInDropPayload) return;
 		const files: string[] = (event as any).payload;
-		const notSupportedFiles: String[] = [];
 		if (files.length === 0) return;
 
 		await triggerServerFolderModalAndAwaitSelection();
 
-		if (!target_server_folder) {
-			hasDirectoryInDropPayload = false;
-			return;
-		}
+		if (!target_server_folder) return;
 
 		const target = target_server_folder;
 
-		const checkedIfFilesAreSupported = files.map(async (file) => {
+		files.map(async (file) => {
+			const isDirectory = await invoke<boolean>('is_directory', { path: file });
 			let job: App.BackupFolderJob = {
-				__type: 'single',
+				__type: isDirectory ? 'folder' : 'file',
+				__frequency: 'one-time',
 				id: randomString(16),
 				state: 'loading',
 				from: {
@@ -146,13 +141,6 @@
 			};
 
 			try {
-				const isDirectory = await invoke<boolean>('is_directory', { path: file });
-
-				if (!isDirectory) {
-					notSupportedFiles.push(file);
-					return;
-				}
-
 				addNewJob(job, target);
 			} catch (e: any) {
 				job.state = 'error';
@@ -160,42 +148,17 @@
 				error = { message: e };
 			}
 		});
-
-		hasDirectoryInDropPayload = false;
-
-    await Promise.all(checkedIfFilesAreSupported);
-
-		if (notSupportedFiles.length > 0) {
-			error = {
-				message: `The following files are not supported: ${notSupportedFiles.join(', ')}`
-			};
-		}
 	});
 
-	const unlistenFileHoverEvent = listen<TauriEvent>(
-		TauriEvent.WINDOW_FILE_DROP_HOVER,
-		async (event) => {
-			hasDirectoryInDropPayload = false;
-			hovering = true;
-			const files: string[] = (event as any).payload;
-			for (const file of files) {
-				if (hasDirectoryInDropPayload) break;
-				try {
-					const isDirectory = await invoke<boolean>('is_directory', { path: file });
-					hasDirectoryInDropPayload = isDirectory;
-				} catch (e: any) {
-					error = { message: e };
-				}
-			}
-		}
-	);
+	const unlistenFileHoverEvent = listen<TauriEvent>(TauriEvent.WINDOW_FILE_DROP_HOVER, (_) => {
+		hovering = true;
+	});
 
-	const unlistenFileCancelEvent = listen(TauriEvent.WINDOW_FILE_DROP_CANCELLED, (event) => {
+	const unlistenFileCancelEvent = listen(TauriEvent.WINDOW_FILE_DROP_CANCELLED, (_) => {
 		hovering = false;
-		hasDirectoryInDropPayload = false;
 	});
 
-	const backupDirectory = async (backup: Backup): Promise<boolean> => {
+	const backupEntity = async (backup: Backup): Promise<boolean> => {
 		const buttonStateKey = `${backup.client_location.entity_name}_${backup.server_location.entity_name}`;
 		button_states[buttonStateKey] = 'loading';
 		try {
@@ -274,7 +237,7 @@
 
 		const task = async (): Promise<void> => {
 			const job = incoming as App.BackupFolderJob;
-			if (!(await backupDirectory(backup))) {
+			if (!(await backupEntity(backup))) {
 				failedJobs = [...failedJobs, job];
 				error = {
 					message: `Failed to backup ${backup.client_location.path}`
@@ -289,7 +252,7 @@
 		incoming.task = task();
 		jobs = [...jobs, incoming];
 
-		if (incoming.__type == 'reacurring') {
+		if (incoming.__frequency == 'recurring') {
 			backups.update((currentState) => [...currentState, backup]);
 			emit('backups-updated', $backups);
 		}
@@ -321,7 +284,7 @@
 		}
 	};
 
-	const selectNewFolderToBackup = async (jobType: BackupFolderJobType) => {
+	const selectNewFolderToBackup = async (frequency: BackupFrequency, type?: BackupJobType) => {
 		const local_folder_path = await open({
 			multiple: false,
 			title: 'Select a folder',
@@ -331,7 +294,8 @@
 		if (!local_folder_path || Array.isArray(local_folder_path)) return;
 
 		incomingJob = {
-			__type: jobType,
+			__type: type || 'folder',
+			__frequency: frequency,
 			id: randomString(16),
 			state: 'loading',
 			from: {
@@ -384,21 +348,12 @@
 
 {#if !initError && $serverConfig?.server_address}
 	<div class={`file_drop_zone ${$clientConfig.theme}`} class:hovering>
-		{#if hasDirectoryInDropPayload}
-			<div class="feedback">
-				<span>
-					<UploadIcon style="font-size: 6rem" />
-					<p>Drop folder here to backup</p>
-				</span>
-			</div>
-		{:else}
-			<div class="feedback">
-				<span>
-					<NotSupportedIcon style="font-size: 6rem" color="var(--clr-danger)" />
-					<p>Single file is upload not supported at the moment, please select a folder</p>
-				</span>
-			</div>
-		{/if}
+		<div class="feedback">
+			<span>
+				<UploadIcon style="font-size: 6rem" />
+				<p>Drop folder here to backup</p>
+			</span>
+		</div>
 	</div>
 	<div class={$clientConfig.theme}>
 		<Modal
@@ -443,10 +398,11 @@
 				</Button>
 				{#if selectMenuOpen}
 					<div class="menu">
-						<button on:click={() => selectNewFolderToBackup('reacurring')}>
+						<button on:click={() => selectNewFolderToBackup('recurring')}>
 							<Reload />Reacurring
 						</button>
-						<button on:click={() => selectNewFolderToBackup('single')}><ArrowIcon />One time</button
+						<button on:click={() => selectNewFolderToBackup('one-time')}
+							><ArrowIcon />One time</button
 						>
 					</div>
 				{/if}
@@ -481,7 +437,7 @@
 						<!-- TODO: add a "backup up to date" state -->
 						<Button
 							type="icon-with_background"
-							onClick={() => backupDirectory(backup)}
+							onClick={() => backupEntity(backup)}
 							style="align-self: center;"
 							state={button_states[backupKey] || 'idle'}
 						>

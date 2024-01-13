@@ -18,7 +18,7 @@
 	let state: ButtonState = 'idle';
 	let expanded = false;
 
-	const filter = (j: App.Job) => j.__type === 'single';
+	const filter = (j: App.Job) => j.__frequency === 'one-time';
 
 	$: iconColor = $clientConfig.theme === 'dark' ? 'var(--clr-text_light)' : 'var(--clr-text_dark)';
 	$: jobs.filter(filter).length > 0 && (state = 'loading');

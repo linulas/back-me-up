@@ -5,7 +5,7 @@
 </script>
 
 <div class="item">
-	{#if job.__type === 'single'}
+	{#if job.__frequency === 'one-time'}
 		<span>
 			<slot />
 		</span>
