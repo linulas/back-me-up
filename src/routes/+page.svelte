@@ -284,23 +284,22 @@
 		}
 	};
 
-	const selectNewFolderToBackup = async (frequency: BackupFrequency, type?: BackupJobType) => {
-		const local_folder_path = await open({
+	const selectNewFolderToBackup = async (frequency: BackupFrequency) => {
+		const local_entity_path = await open({
 			multiple: false,
-			title: 'Select a folder',
-			directory: true
+			title: 'Select a file',
 		});
 
-		if (!local_folder_path || Array.isArray(local_folder_path)) return;
+		if (!local_entity_path || Array.isArray(local_entity_path)) return;
 
 		incomingJob = {
-			__type: type || 'folder',
+			__type: await invoke('is_directory', { path: local_entity_path }) ? 'folder' : 'file',
 			__frequency: frequency,
 			id: randomString(16),
 			state: 'loading',
 			from: {
-				name: extractFileNameFromPath(local_folder_path),
-				path: local_folder_path,
+				name: extractFileNameFromPath(local_entity_path),
+				path: local_entity_path,
 				size: null
 			}
 		};
