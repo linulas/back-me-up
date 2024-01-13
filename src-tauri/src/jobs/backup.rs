@@ -16,11 +16,11 @@ pub struct WatchDirectory {
     config: app::Config,
 }
 
-/// Starts a thread watching a directory for changes and backs up files accordingly.
+/// Starts a thread watching a entity for changes and backs up files accordingly.
 ///
 /// # Panics
-/// Panics if the directory does not exist, or if the watcher for some reason could not start successfully.
-pub fn directory_on_change(worker: &Arguments, backup: &Backup, config: Config) {
+/// Panics if the entity does not exist, or if the watcher for some reason could not start successfully.
+pub fn entity_on_change(worker: &Arguments, backup: &Backup, config: Config) {
     let worker_receiver = worker.receiver.lock().expect("Must have a thread receiver");
     let path = Path::new(&backup.client_location.path);
     let (sender, receiver) = std::sync::mpsc::channel();
@@ -38,8 +38,8 @@ pub fn directory_on_change(worker: &Arguments, backup: &Backup, config: Config) 
     };
 
     if let Err(e) = watcher.watch(path.as_ref(), RecursiveMode::Recursive) {
-        error!("failed to watch directory: {e:?}");
-        panic!("failed to watch directory");
+        error!("failed to watch entity: {e:?}");
+        panic!("failed to watch entity");
     }
 
     info!("watching {}", &backup.client_location.path);
@@ -233,13 +233,7 @@ fn exec_backup_command(
         options: job.backup.options.clone(),
     };
 
-    let is_directory = if data.is_dir() {
-        info!("Backup directory: {path:?}");
-        true
-    } else {
-        info!("Backup file: {path:?}");
-        false
-    };
+    info!("Backup entity: {path:?}");
     info!(
         "Server location: {}",
         backup_realtive_to_root.server_location.path
@@ -247,7 +241,7 @@ fn exec_backup_command(
 
     *latest_modified = entity_modified_date;
     if let Err(e) =
-        ssh::commands::backup_to_server(&backup_realtive_to_root, &job.config, is_directory)
+        ssh::commands::backup_to_server(&backup_realtive_to_root, &job.config, data.is_dir())
     {
         error!("Could not backup: {e:?}");
     }

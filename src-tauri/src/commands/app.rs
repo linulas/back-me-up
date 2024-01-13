@@ -36,7 +36,7 @@ pub fn backup_on_change(state: &MutexState, backup: Backup) -> Result<(), Error>
         jobs.lock()
             .expect("Could not lock jobs")
             .insert(job_id, worker.id);
-        jobs::backup::directory_on_change(&worker, &backup, config_to_move_into_thread);
+        jobs::backup::entity_on_change(&worker, &backup, config_to_move_into_thread);
     })?;
 
     Ok(())
@@ -130,7 +130,7 @@ pub fn start_background_backups(state: &MutexState, backups: &[Backup]) -> Resul
             jobs.lock()
                 .expect("Could not lock jobs")
                 .insert(job_id, worker.id);
-            jobs::backup::directory_on_change(&worker, &backup, config_to_move_into_thread);
+            jobs::backup::entity_on_change(&worker, &backup, config_to_move_into_thread);
         })?;
     }
 
