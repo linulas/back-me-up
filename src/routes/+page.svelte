@@ -126,7 +126,7 @@
 
 		const target = target_server_folder;
 
-		files.map(async (file) => {
+		files.map(async (file, i) => {
 			const isDirectory = await invoke<boolean>('is_directory', { path: file });
 			let job: App.BackupFolderJob = {
 				__type: isDirectory ? 'folder' : 'file',
@@ -141,7 +141,7 @@
 			};
 
 			try {
-				addNewJob(job, target);
+				addNewJob(job, target, i === files.length - 1); // only clear state on last iteration
 			} catch (e: any) {
 				job.state = 'error';
 				failedJobs = [...failedJobs, job];
@@ -184,7 +184,7 @@
 		}
 	};
 
-	const addNewJob = async (incoming?: App.BackupFolderJob, target?: string) => {
+	const addNewJob = async (incoming?: App.BackupFolderJob, target?: string, clearState = true) => {
 		if (!incoming?.from?.path) {
 			selectServerFolderModalOpen = false;
 			error = {
@@ -257,9 +257,11 @@
 			emit('backups-updated', $backups);
 		}
 
-		incomingJob = undefined;
-		target_server_folder = undefined;
-		use_client_directory = false;
+		if (clearState) {
+			incomingJob = undefined;
+			target_server_folder = undefined;
+			use_client_directory = false;
+		}
 	};
 
 	const deleteBackup = async (backup: Backup) => {
@@ -287,13 +289,13 @@
 	const selectNewFolderToBackup = async (frequency: BackupFrequency) => {
 		const local_entity_path = await open({
 			multiple: false,
-			title: 'Select a file',
+			title: 'Select a file'
 		});
 
 		if (!local_entity_path || Array.isArray(local_entity_path)) return;
 
 		incomingJob = {
-			__type: await invoke('is_directory', { path: local_entity_path }) ? 'folder' : 'file',
+			__type: (await invoke('is_directory', { path: local_entity_path })) ? 'folder' : 'file',
 			__frequency: frequency,
 			id: randomString(16),
 			state: 'loading',

@@ -206,7 +206,7 @@ fn exec_backup_command(
     );
 
     let server_location_path = if let Some(option) = &job.backup.options {
-        if option.use_client_directory {
+        if data.is_dir() && option.use_client_directory {
             format!(
                 "{}/{}/{}{relative_path}",
                 job.backup.server_location.path,
