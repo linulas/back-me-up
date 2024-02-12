@@ -359,7 +359,7 @@
 	<div class={$clientConfig.theme}>
 		<Modal
 			bind:open={selectServerFolderModalOpen}
-			onClickOutside={() => (target_server_folder = undefined)}
+			onClickOutside={() => (target_server_folder = undefined, incomingJob = undefined)}
 		>
 			<div class="modal">
 				<div class="form_group">
