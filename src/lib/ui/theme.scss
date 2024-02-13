@@ -9,6 +9,7 @@ $clr-warning: $amber-500;
 $clr-success: $emerald-500;
 $clr-text_light: white;
 $clr-text_dark: $neutral-900;
+$clr-text_muted: $neutral-500;
 
 // Ligth theme colors
 $clr-background: $neutral-50;
@@ -33,6 +34,7 @@ $clr-secondary-action_hover_dark: $slate-600;
   --clr-success: #{$clr-success};
   --clr-text_light: #{$clr-text_light};
   --clr-text_dark: #{$clr-text_dark};
+  --clr-text_muted: #{$clr-text_muted};
 
   // Light theme
   --clr-background: #{$clr-background};
