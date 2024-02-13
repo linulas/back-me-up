@@ -12,6 +12,7 @@
 	import { onUpdaterEvent } from '@tauri-apps/api/updater';
 	import { info, error as logError } from 'tauri-plugin-log-api';
 	import { randomString } from '$lib/generate';
+
 	import ArrowIcon from '~icons/ion/arrow-forward';
 	import CaretDownIcon from '~icons/ion/caret-down';
 	import Reload from '~icons/ion/reload';
@@ -22,6 +23,7 @@
 	import Select from '$lib/ui/select.svelte';
 	import Modal from '$lib/ui/modal.svelte';
 	import JobStatusPopup from '$lib/ui/job_status/status.svelte';
+	import Toggle from '$lib/ui/toggle.svelte';
 
 	import type { Folder } from '../../src-tauri/bindings/Folder';
 	import type { Backup } from '../../src-tauri/bindings/Backup';
@@ -42,6 +44,7 @@
 	let outsideClickListener: (event: MouseEvent) => void;
 	let hovering = false;
 	let selectServerFolderModalOpen = false;
+	let isFileSelection = false;
 
 	$: selectItems = server_home_folders.map((folder) => ({
 		title: folder.name,
@@ -120,6 +123,14 @@
 		const files: string[] = (event as any).payload;
 		if (files.length === 0) return;
 
+		files.map(async (file) => {
+			if (await invoke<boolean>('is_directory', { path: file })) {
+				isFileSelection = false;
+			} else {
+				isFileSelection = true;
+			}
+		});
+
 		await triggerServerFolderModalAndAwaitSelection();
 
 		if (!target_server_folder) return;
@@ -141,7 +152,7 @@
 			};
 
 			try {
-				addNewJob(job, target, i === files.length - 1); // only clear state on last iteration
+				addNewJob(job, target, i === files.length - 1 /* only clear state on last iteration */);
 			} catch (e: any) {
 				job.state = 'error';
 				failedJobs = [...failedJobs, job];
@@ -289,7 +300,8 @@
 	const selectNewFolderToBackup = async (frequency: BackupFrequency) => {
 		const local_entity_path = await open({
 			multiple: false,
-			title: 'Select a file'
+			title: `Select a ${isFileSelection ? 'file' : 'folder'}`,
+			directory: !isFileSelection
 		});
 
 		if (!local_entity_path || Array.isArray(local_entity_path)) return;
@@ -329,7 +341,10 @@
 	onMount(() => {
 		outsideClickListener = (event: MouseEvent) => {
 			const target = event.target as HTMLElement;
-			if (!target.closest('.select') || target.closest('.menu')) {
+			if (
+				!target.closest('.select') ||
+				(target.closest('.menu') && !target.closest('.keep_open'))
+			) {
 				selectMenuOpen = false;
 				window.removeEventListener('click', outsideClickListener);
 			}
@@ -359,22 +374,24 @@
 	<div class={$clientConfig.theme}>
 		<Modal
 			bind:open={selectServerFolderModalOpen}
-			onClickOutside={() => (target_server_folder = undefined, incomingJob = undefined)}
+			onClickOutside={() => ((target_server_folder = undefined), (incomingJob = undefined))}
 		>
 			<div class="modal">
 				<div class="form_group">
 					<label for="server_home_folders">Select target folder on the server</label>
 					<Select items={selectItems} bind:value={target_server_folder} />
 				</div>
-				<div class="form_group">
-					<label for="use_client_directory">Use client directory on server</label>
-					<input
-						id="use_client_directory"
-						type="checkbox"
-						checked={use_client_directory}
-						on:change={() => (use_client_directory = !use_client_directory)}
-					/>
-				</div>
+				{#if !isFileSelection}
+					<div class="form_group">
+						<label for="use_client_directory">Use client directory on server</label>
+						<input
+							id="use_client_directory"
+							type="checkbox"
+							checked={use_client_directory}
+							on:change={() => (use_client_directory = !use_client_directory)}
+						/>
+					</div>
+				{/if}
 				<Button
 					type="secondary"
 					onClick={() =>
@@ -399,12 +416,15 @@
 				</Button>
 				{#if selectMenuOpen}
 					<div class="menu">
+						<div class="toggle keep_open">
+							<Toggle options={['Folder', 'File']} bind:checked={isFileSelection} />
+						</div>
 						<button on:click={() => selectNewFolderToBackup('recurring')}>
 							<Reload />Reacurring
 						</button>
-						<button on:click={() => selectNewFolderToBackup('one-time')}
-							><ArrowIcon />One time</button
-						>
+						<button on:click={() => selectNewFolderToBackup('one-time')}>
+							<ArrowIcon />One time
+						</button>
 					</div>
 				{/if}
 			</div>
@@ -528,7 +548,7 @@
 		.menu {
 			@include box;
 			position: absolute;
-			bottom: -5.5rem;
+			bottom: -7.4rem;
 			left: 0;
 			display: flex;
 			flex-direction: column;
@@ -536,6 +556,11 @@
 			background-color: $clr-foreground;
 			padding: 0.5rem;
 			z-index: 0;
+
+			.toggle {
+				padding: 0.2rem;
+				border-bottom: 1px solid $neutral-300;
+			}
 
 			button {
 				border: none;
@@ -620,6 +645,10 @@
 		.select {
 			.menu {
 				background-color: $clr-secondary-action_dark;
+
+				.toggle {
+					border-color: $neutral-500;
+				}
 
 				button {
 					color: $clr-text_light;
