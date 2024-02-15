@@ -1,7 +1,24 @@
-use std::fmt::Display;
-
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
+use std::path::PathBuf;
 use ts_rs::TS;
+
+#[derive(TS, Serialize, Deserialize, Clone)]
+#[ts(export, export_to = "bindings/BackupKind.ts")]
+pub enum Kind {
+    File,
+    Directory,
+}
+
+impl From<&PathBuf> for Kind {
+    fn from(path: &PathBuf) -> Self {
+        if path.is_file() {
+            Self::File
+        } else {
+            Self::Directory
+        }
+    }
+}
 
 #[derive(TS, Serialize, Deserialize, Clone)]
 #[ts(export)]
@@ -19,6 +36,7 @@ pub struct Options {
 #[derive(TS, Serialize, Deserialize, Clone)]
 #[ts(export)]
 pub struct Backup {
+    pub kind: Kind,
     pub client_location: Location,
     pub server_location: Location,
     pub latest_run: Option<u64>,

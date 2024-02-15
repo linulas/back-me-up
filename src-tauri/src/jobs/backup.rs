@@ -1,19 +1,48 @@
 use super::{id_from_backup, Arguments, Error, Kind, Pool, ThreadAction};
+use crate::commands::os;
 use crate::models::app::{self, Config, MutexState};
-use crate::models::backup::{Backup, Location};
+use crate::models::backup::{Backup, Kind as BackupKind, Location};
 use crate::ssh;
 use chrono::{DateTime, Local};
 use log::{error, info};
 use notify::{self, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 use std::io;
-use std::path::Path;
-use std::process::Command;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, MutexGuard};
 
-pub struct WatchDirectory {
-    backup: Backup,
-    config: app::Config,
+type Data = (Backup, Config);
+
+pub enum Watch {
+    Directory(Data),
+    File(Data),
+}
+
+impl Watch {
+    pub fn exec_backup(
+        &self,
+        event: &Event,
+        latest_modified: &mut DateTime<Local>,
+    ) -> Result<(), notify::Error> {
+        match self {
+            Self::File(data) => exec_backup_file(event, data, latest_modified),
+            Self::Directory(data) => exec_backup_directory(event, data, latest_modified),
+        }
+    }
+
+    pub fn get_data(&self) -> &Data {
+        match self {
+            Self::File(data) => data,
+            Self::Directory(data) => data,
+        }
+    }
+
+    pub fn display_kind(&self) -> String {
+        match self {
+            Self::File(_) => "File".to_string(),
+            Self::Directory(_) => "Directory".to_string(),
+        }
+    }
 }
 
 /// Starts a thread watching a entity for changes and backs up files accordingly.
@@ -22,19 +51,32 @@ pub struct WatchDirectory {
 /// Panics if the entity does not exist, or if the watcher for some reason could not start successfully.
 pub fn entity_on_change(worker: &Arguments, backup: &Backup, config: Config) {
     let worker_receiver = worker.receiver.lock().expect("Must have a thread receiver");
-    let path = Path::new(&backup.client_location.path);
+
+    let path = match backup.kind {
+        BackupKind::Directory => Path::new(&backup.client_location.path),
+        BackupKind::File => Path::new(&backup.client_location.path)
+            .parent()
+            .expect("File should have a parent directory"),
+    };
+
+    if !path.exists() {
+        error!("Entity does not exist: {path:?}");
+        return;
+    }
+
     let (sender, receiver) = std::sync::mpsc::channel();
     let mut watcher = RecommendedWatcher::new(sender, notify::Config::default())
         .expect("failed to create watcher");
-    let mut last_modified: DateTime<Local> = Path::new(&backup.client_location.path)
+    let mut last_modified: DateTime<Local> = path
         .metadata()
         .expect("failed to get metadata")
         .modified()
         .expect("expected last modification time (SystemTime) from metadata")
         .into();
-    let job = WatchDirectory {
-        backup: backup.clone(),
-        config,
+
+    let job = match backup.kind {
+        BackupKind::File => Watch::File((backup.clone(), config)),
+        BackupKind::Directory => Watch::Directory((backup.clone(), config)),
     };
 
     if let Err(e) = watcher.watch(path.as_ref(), RecursiveMode::Recursive) {
@@ -72,7 +114,7 @@ pub fn entity_on_change(worker: &Arguments, backup: &Backup, config: Config) {
         match watcher_res {
             Ok(event) => {
                 if let Err(e) = handle_notify_event(&event, &job, &mut last_modified) {
-                    handle_notify_error(&e, &event, &job);
+                    handle_notify_error(&e, &event, &job.get_data());
                 }
             }
             Err(e) => error!("notify event failed: {e:?}"),
@@ -89,7 +131,7 @@ pub fn entity_on_change(worker: &Arguments, backup: &Backup, config: Config) {
     }
 }
 
-fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
+fn handle_notify_error(e: &notify::Error, event: &Event, (backup, config): &Data) {
     let error_is_of_kind_not_found = match &e.kind {
         notify::ErrorKind::Io(io_error) => matches!(io_error.kind(), io::ErrorKind::NotFound),
         _ => false,
@@ -102,8 +144,16 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
 
     if let Some(path_buf) = event.paths.get(0) {
         let target_path = path_buf.to_str().unwrap_or("").replace(' ', r"\ ");
-        let server_folder_path = job.backup.server_location.path.replace(' ', r"\ ");
-        let client_folder_path = job.backup.client_location.path.replace(' ', r"\ ");
+        let server_folder_path = match backup.kind {
+            BackupKind::File => path_buf
+                .parent()
+                .expect("File should have a parent directory")
+                .display()
+                .to_string()
+                .replace(' ', r"\ "),
+            BackupKind::Directory => backup.server_location.path.replace(' ', r"\ "),
+        };
+        let client_folder_path = backup.client_location.path.replace(' ', r"\ ");
         // make sure to not delete root folder for the backup
         if target_path == server_folder_path {
             info!("Ignoring deletion of {target_path}");
@@ -121,6 +171,7 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
             .replace(' ', r"\ ");
 
         let backup_realtive_to_root = Backup {
+            kind: backup.kind.clone(),
             client_location: Location {
                 entity_name: file_name.clone(),
                 path: target_path,
@@ -129,17 +180,15 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
                 entity_name: file_name,
                 path: format!(
                     "{}/{}/{}{relative_path}",
-                    server_folder_path,
-                    job.config.client_name,
-                    job.backup.client_location.entity_name
+                    server_folder_path, config.client_name, backup.client_location.entity_name
                 ),
             },
             latest_run: None,
-            options: job.backup.options.clone(),
+            options: backup.options.clone(),
         };
 
         info!("Deleting {}", backup_realtive_to_root.server_location.path);
-        let result = ssh::commands::delete_from_server(&backup_realtive_to_root, &job.config);
+        let result = ssh::commands::delete_from_server(&backup_realtive_to_root, &config);
 
         if let Err(e) = result {
             error!("Could not delete_from_server: {e:?}");
@@ -147,9 +196,65 @@ fn handle_notify_error(e: &notify::Error, event: &Event, job: &WatchDirectory) {
     }
 }
 
-fn exec_backup_command(
+fn exec_backup_file(
     event: &Event,
-    job: &WatchDirectory,
+    (backup, config): &Data,
+    latest_modified: &mut DateTime<Local>,
+) -> Result<(), notify::Error> {
+    if event.paths.get(0).is_none() {
+        return Err(notify::Error::path_not_found());
+    }
+
+    let path = match event.paths.get(0) {
+        Some(value) => value,
+        None => return Ok(()),
+    };
+
+    if path.display().to_string() != backup.client_location.path {
+        info!("This is not the entity we are watching, ignoring: {path:?}");
+        return Ok(());
+    }
+
+    let data = path.metadata()?;
+    let entity_modified_date: DateTime<Local> = data.modified()?.into();
+    let new_modified_date: DateTime<Local> = path.metadata()?.modified()?.into();
+
+    if new_modified_date.timestamp() <= latest_modified.timestamp() {
+        info!("Ignoring already up to date entity: {path:?}");
+        return Ok(());
+    }
+
+    let server_location_path_with_client_directory =
+        format!("{}/{}", backup.server_location.path, config.client_name,);
+
+    let target = Backup {
+        kind: BackupKind::from(path),
+        client_location: Location {
+            path: path.to_str().unwrap_or_default().to_string(),
+            entity_name: backup.client_location.entity_name.clone(),
+        },
+        server_location: Location {
+            path: server_location_path_with_client_directory,
+            entity_name: backup.server_location.entity_name.clone(),
+        },
+        latest_run: None,
+        options: backup.options.clone(),
+    };
+
+    info!("Backup entity: {path:?}");
+    info!("Server location: {}", target.server_location.path);
+
+    *latest_modified = entity_modified_date;
+    if let Err(e) = ssh::commands::backup_to_server(&target, &config, data.is_dir()) {
+        error!("Could not backup: {e:?}");
+    }
+
+    Ok(())
+}
+
+fn exec_backup_directory(
+    event: &Event,
+    (backup, config): &Data,
     latest_modified: &mut DateTime<Local>,
 ) -> Result<(), notify::Error> {
     if event.paths.get(0).is_none() {
@@ -187,7 +292,7 @@ fn exec_backup_command(
 
     let data = path.metadata()?;
     let entity_modified_date: DateTime<Local> = data.modified()?.into();
-    let root_path = Path::new(&job.backup.client_location.path);
+    let root_path = Path::new(&backup.client_location.path);
     let new_modified_date: DateTime<Local> = root_path.metadata()?.modified()?.into();
 
     if new_modified_date.timestamp() <= latest_modified.timestamp() {
@@ -198,20 +303,18 @@ fn exec_backup_command(
     let relative_path = path
         .to_str()
         .unwrap_or_default()
-        .replace(&job.backup.client_location.path, "");
+        .replace(&backup.client_location.path, "");
 
     let server_location_path_without_client_directory = format!(
         "{}/{}{relative_path}",
-        job.backup.server_location.path, job.config.client_name,
+        backup.server_location.path, config.client_name,
     );
 
-    let server_location_path = if let Some(option) = &job.backup.options {
-        if data.is_dir() && option.use_client_directory {
+    let server_location_path = if let Some(option) = &backup.options {
+        if option.use_client_directory {
             format!(
                 "{}/{}/{}{relative_path}",
-                job.backup.server_location.path,
-                job.config.client_name,
-                job.backup.client_location.entity_name
+                backup.server_location.path, config.client_name, backup.client_location.entity_name
             )
         } else {
             server_location_path_without_client_directory
@@ -221,16 +324,17 @@ fn exec_backup_command(
     };
 
     let backup_realtive_to_root = Backup {
+        kind: BackupKind::from(path),
         client_location: Location {
             path: path.to_str().unwrap_or_default().to_string(),
-            entity_name: job.backup.client_location.entity_name.clone(),
+            entity_name: backup.client_location.entity_name.clone(),
         },
         server_location: Location {
             path: server_location_path,
-            entity_name: job.backup.server_location.entity_name.clone(),
+            entity_name: backup.server_location.entity_name.clone(),
         },
         latest_run: None,
-        options: job.backup.options.clone(),
+        options: backup.options.clone(),
     };
 
     info!("Backup entity: {path:?}");
@@ -241,7 +345,7 @@ fn exec_backup_command(
 
     *latest_modified = entity_modified_date;
     if let Err(e) =
-        ssh::commands::backup_to_server(&backup_realtive_to_root, &job.config, data.is_dir())
+        ssh::commands::backup_to_server(&backup_realtive_to_root, &config, data.is_dir())
     {
         error!("Could not backup: {e:?}");
     }
@@ -251,13 +355,13 @@ fn exec_backup_command(
 
 fn handle_notify_event(
     event: &Event,
-    job: &WatchDirectory,
+    job: &Watch,
     latest_modified: &mut DateTime<Local>,
 ) -> Result<(), notify::Error> {
     match event.kind {
-        notify::EventKind::Create(_) => exec_backup_command(event, job, latest_modified)?,
+        notify::EventKind::Create(_) => job.exec_backup(event, latest_modified)?,
         notify::EventKind::Modify(notify::event::ModifyKind::Name(_)) => {
-            exec_backup_command(event, job, latest_modified)?;
+            job.exec_backup(event, latest_modified)?;
         }
         _ => (),
     }
@@ -272,37 +376,36 @@ pub fn terminate_all<S: ::std::hash::BuildHasher>(
 ) {
     jobs.iter_mut().for_each(|(job_id, worker)| {
         info!("Terminating job: {job_id}");
-        let client_folder_path = job_id.split('_').next().expect("Could not split job_id");
+        let client_entity_path = job_id.split('_').next().expect("Could not split job_id");
 
         if let Err(why) = pool.terminate_job(*worker, || {
-            let file_path = format!("{client_folder_path}/.bmu_event_trigger");
-
-            match Command::new("touch").args([&file_path]).output() {
-                Ok(output) => {
-                    if !output.status.success() {
-                        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                        let why = format!("Failed to create file: {stdout}\n{stderr}");
-                        error!("{why}");
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to create file: {e:?}");
-                }
+            let path_buf = PathBuf::from(&client_entity_path);
+            if !path_buf.exists() {
+                error!("File does not exist: {path_buf:?}");
+                return;
             }
 
-            match Command::new("rm").args([&file_path]).output() {
-                Ok(output) => {
-                    if !output.status.success() {
-                        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                        let why = format!("Failed to remove file: {stdout}\n{stderr}");
-                        error!("{why}");
-                    }
+            // Triggers a Notify event in order to be able to cancel the background job.
+            let trigger_file_path = match BackupKind::from(&path_buf) {
+                BackupKind::File => {
+                    let parent = path_buf
+                        .parent()
+                        .expect("File should have a parent")
+                        .display()
+                        .to_string();
+                    format!("{parent}/.bmu_event_trigger")
                 }
-                Err(e) => {
-                    error!("Failed to remove file: {e:?}");
+                BackupKind::Directory => {
+                    format!("{client_entity_path}/.bmu_event_trigger")
                 }
+            };
+
+            if let Err(e) = os::create_file(&trigger_file_path) {
+                error!("Failed to create file: {e:?}");
+            }
+
+            if let Err(e) = os::delete_file(&trigger_file_path) {
+                error!("Failed to delete file: {e:?}");
             }
         }) {
             error!("Could not terminate job: {why}");
@@ -346,13 +449,13 @@ pub async fn entity_to_server(
 
     // prepend client_name as a root folder on the server for the backup
     backup.server_location.path = format!("{}/{}", backup.server_location.path, config.client_name);
-    let job_id_for_client = id_from_backup(&backup, &Kind::Backup);
+    let job_id_for_client = id_from_backup(&backup, &Kind::BackupFolder);
     if failed_jobs.lock()?.contains_key(&job_id_for_client) {
         failed_jobs.lock()?.remove(&job_id_for_client);
     }
 
     pool.execute(move |worker| {
-        let job_id = id_from_backup(&backup, &Kind::Backup);
+        let job_id = id_from_backup(&backup, &Kind::BackupFolder);
         jobs.lock()
             .expect("Could not lock jobs")
             .insert(job_id.clone(), worker.id);

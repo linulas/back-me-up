@@ -77,8 +77,10 @@ pub struct Handle {
 }
 
 pub enum Kind {
-    BackupOnChange,
-    Backup,
+    BackupFolderOnChange,
+    BackupFileOnChange,
+    BackupFolder,
+    BackupFile,
 }
 
 #[derive(TS, Serialize)]
@@ -346,18 +348,44 @@ impl Worker {
 #[must_use]
 pub fn id_from_backup(backup: &Backup, kind: &Kind) -> String {
     match kind {
-        Kind::Backup => {
+        Kind::BackupFolder => {
             format!(
-                "{}_{}_backup",
+                "{}_{}_backup_folder",
                 backup.client_location.path, backup.server_location.path
             )
         }
-        Kind::BackupOnChange => {
+        Kind::BackupFolderOnChange => {
             format!(
-                "{}_{}_backup_on_change",
+                "{}_{}_backup_folder_on_change",
                 backup.client_location.path, backup.server_location.path
             )
         }
+        Kind::BackupFile => {
+            format!(
+                "{}_{}_backup_file",
+                backup.client_location.path, backup.server_location.path
+            )
+        }
+        Kind::BackupFileOnChange => {
+            format!(
+                "{}_{}_backup_file_on_change",
+                backup.client_location.path, backup.server_location.path
+            )
+        }
+    }
+}
+
+pub fn kind_from_id(id: &str) -> Result<Kind, Error> {
+    if id.contains("backup_folder") {
+        Ok(Kind::BackupFolder)
+    } else if id.contains("backup_folder_on_change") {
+        Ok(Kind::BackupFolderOnChange)
+    } else if id.contains("backup_file") {
+        Ok(Kind::BackupFile)
+    } else if id.contains("backup_file_on_change") {
+        Ok(Kind::BackupFileOnChange)
+    } else {
+        Err(Error::App(app::Error::InvalidJobId(String::from(id))))
     }
 }
 

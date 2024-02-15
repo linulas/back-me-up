@@ -11,7 +11,8 @@ pub enum Error {
     MissingConnection(String),
     Config(String),
     JobPool(String),
-    Storage(String)
+    Storage(String),
+    InvalidJobId(String)
 }
 
 impl From<PoisonError<MutexGuard<'_, Option<Config>>>> for Error {

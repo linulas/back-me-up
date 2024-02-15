@@ -1,8 +1,9 @@
-use super::Error;
+use super::{os, Error};
 use crate::jobs;
 use crate::models::app::{self, MutexState};
-use crate::models::backup::Backup;
-use log::info;
+use crate::models::backup::{Backup, Kind as BackupKind};
+use log::{error, info};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 pub fn backup_on_change(state: &MutexState, backup: Backup) -> Result<(), Error> {
@@ -20,7 +21,7 @@ pub fn backup_on_change(state: &MutexState, backup: Backup) -> Result<(), Error>
         ))));
     }
 
-    let job_id = jobs::id_from_backup(&backup, &jobs::Kind::BackupOnChange);
+    let job_id = jobs::id_from_backup(&backup, &jobs::Kind::BackupFolderOnChange);
     let jobs = Arc::clone(&state.jobs);
 
     if jobs.lock()?.iter().any(|(id, _)| id == &job_id) {
@@ -44,7 +45,7 @@ pub fn backup_on_change(state: &MutexState, backup: Backup) -> Result<(), Error>
 
 pub fn terminate_background_backup(state: &MutexState, backup: &Backup) -> Result<(), Error> {
     let mut jobs = state.jobs.lock()?;
-    let job_id = &jobs::id_from_backup(backup, &jobs::Kind::BackupOnChange);
+    let job_id = &jobs::id_from_backup(backup, &jobs::Kind::BackupFolderOnChange);
     let worker_id = if let Some(id) = jobs.get(job_id) {
         id
     } else {
@@ -54,10 +55,35 @@ pub fn terminate_background_backup(state: &MutexState, backup: &Backup) -> Resul
 
     let mut pool = state.pool.lock()?;
     let result = pool.terminate_job(*worker_id, || {
-        let file_path = format!("{}/.bmu_event_trigger", backup.client_location.path);
+        let path_buf = PathBuf::from(&backup.client_location.path);
+        if !path_buf.exists() {
+            error!("File does not exist: {path_buf:?}");
+            return;
+        }
 
-        _ = super::os::create_file(&file_path);
-        _ = super::os::delete_file(&file_path);
+        let client_entity_path = &backup.client_location.path;
+
+        let trigger_file_path = match BackupKind::from(&path_buf) {
+            BackupKind::File => {
+                let parent = path_buf
+                    .parent()
+                    .expect("File should have a parent")
+                    .display()
+                    .to_string();
+                format!("{parent}/.bmu_event_trigger")
+            }
+            BackupKind::Directory => {
+                format!("{client_entity_path}/.bmu_event_trigger")
+            }
+        };
+
+        if let Err(e) = os::create_file(&trigger_file_path) {
+            error!("Failed to create file: {e:?}");
+        }
+
+        if let Err(e) = os::delete_file(&trigger_file_path) {
+            error!("Failed to delete file: {e:?}");
+        }
     });
 
     if let Err(e) = result {
@@ -91,9 +117,9 @@ pub fn start_background_backups(state: &MutexState, backups: &[Backup]) -> Resul
     let backup_jobs_that_are_not_already_running: Vec<_> = backups
         .iter()
         .filter(|b| {
-            !jobs
-                .iter()
-                .any(|(job_id, _)| job_id == &jobs::id_from_backup(b, &jobs::Kind::BackupOnChange))
+            !jobs.iter().any(|(job_id, _)| {
+                job_id == &jobs::id_from_backup(b, &jobs::Kind::BackupFolderOnChange)
+            })
         })
         .collect();
 
@@ -122,7 +148,7 @@ pub fn start_background_backups(state: &MutexState, backups: &[Backup]) -> Resul
 
         let backup = value.clone();
 
-        let job_id = jobs::id_from_backup(&backup, &jobs::Kind::BackupOnChange);
+        let job_id = jobs::id_from_backup(&backup, &jobs::Kind::BackupFolderOnChange);
         let jobs = Arc::clone(&state.jobs);
 
         let mut pool = state.pool.lock()?;

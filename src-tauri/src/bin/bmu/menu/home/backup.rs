@@ -2,7 +2,7 @@ use super::Error;
 use crate::menu::Action;
 use crate::{daemon, storage};
 use back_me_up::models::app::MutexState;
-use back_me_up::models::backup::{Backup, Location, Options};
+use back_me_up::models::backup::{Backup, Location, Options, Kind};
 use back_me_up::models::storage::Folder;
 use back_me_up::ssh::commands::list_home_folders;
 use back_me_up::{commands, jobs};
@@ -124,8 +124,10 @@ fn select() -> Result<HandleOrGoBack, Error> {
 }
 
 pub async fn add(state: &MutexState) -> Result<Action, Error> {
+    let (client_location, kind) = get_client_location_and_kind()?;
     let backup = Backup {
-        client_location: get_client_location()?,
+        kind,
+        client_location,
         server_location: get_server_location(state).await?,
         latest_run: None,
         options: Some(get_options()?),
@@ -200,25 +202,25 @@ async fn get_server_location(state: &MutexState) -> Result<Location, Error> {
     Err(Error::Path(String::from("Could not parse path")))
 }
 
-fn get_client_location() -> Result<Location, Error> {
+fn get_client_location_and_kind() -> Result<(Location, Kind), Error> {
     let mut input = String::new();
     let mut path = PathBuf::new();
     let mut error = String::new();
 
-    while !path.is_dir() {
+    while !path.exists() {
         input.clear();
 
         if !error.is_empty() {
             print!("\x1B[2A\x1B[2K");
         }
 
-        print!("Enter absolute path to folder: ");
+        print!("Enter absolute path to the entity you want to backup: ");
         io::stdout().flush()?;
         io::stdin().read_line(&mut input)?;
 
         path = PathBuf::from(input.trim());
 
-        if path.is_dir() {
+        if path.exists() {
             if !error.is_empty() {
                 print!("\x1B[1A\x1B[2K");
             }
@@ -234,10 +236,19 @@ fn get_client_location() -> Result<Location, Error> {
                 .unwrap_or_default()
                 .to_string();
 
-            return Ok(Location {
-                path: client_path,
-                entity_name,
-            });
+            let kind = if path.is_file() {
+                Kind::File
+            } else {
+                Kind::Directory
+            };
+
+            return Ok((
+                Location {
+                    path: client_path,
+                    entity_name,
+                },
+                kind,
+            ));
         }
         error = format!("Invalid path: {path:?}");
     }

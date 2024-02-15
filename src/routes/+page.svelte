@@ -235,6 +235,9 @@
 		}
 
 		const backup: Backup = {
+			kind: (await invoke<boolean>('is_directory', { path: incoming.from.path }))
+				? 'Directory'
+				: 'File',
 			client_location: {
 				entity_name: incoming.from.name,
 				path: incoming.from.path
